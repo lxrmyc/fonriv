@@ -87,8 +87,23 @@ Data (SQLite + logs) lives in `data/` under the install directory. **Back up `da
 
 **About → Check for updates** targets **GitHub Releases** by default (the dialog can switch to a self-hosted static directory). Every package is sha256-verified before it is applied; a failed check is rejected automatically.
 
+## Building from source
+
+```bash
+# The source code is this repository (the tarball also contains it).
+python3 -m venv venv && venv/bin/pip install -r requirements.txt
+sudo bash scripts/install.sh --yes
+
+# or build distribution packages yourself (output in dist/)
+bash packaging/build_tarball.sh            # tar.gz + sha256
+bash packaging/build_deb.sh                # deb (Debian 12 / Ubuntu 22.04+)
+```
+
 ## License
 
 Fonriv Community Edition is released under the **GNU AGPL-3.0** — see [LICENSE](LICENSE).
 You are free to use, modify and redistribute it; if you run a modified version as a network service, you must offer the corresponding source to its users.
-Copyright © 2026 Fonriv.
+- **Source code**: <https://github.com/lxrmyc/fonriv/>
+- **Website / 官网**: [www.fonriv.com](https://www.fonriv.com) — docs, downloads and more
+
+Copyright © 2026 Fonriv. This program comes with ABSOLUTELY NO WARRANTY; see the license for details.

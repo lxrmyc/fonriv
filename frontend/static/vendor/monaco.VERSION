@@ -1,0 +1,6 @@
+Monaco Editor 0.45.0 (代码/配置文件编辑器组件 · 仅用于文件编辑与预览高亮)
+来源: npm 包 monaco-editor@0.45.0 (commit 5e5af013f8d295555a7210df0d5f2cea0bf5dd56)
+许可: MIT (见同目录 monaco.LICENSE; 压缩文件内亦保留版权头)
+入库文件: monaco.min.js · monaco.min.css · monaco.min.nls.js · loader.js
+入库日期: 2026-09-12
+备注: 原件为已压缩产物, 未做任何修改。

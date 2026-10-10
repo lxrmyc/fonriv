@@ -1,0 +1,145 @@
+#!/bin/bash
+# Fonriv deb · 安装后: 建数据目录 / 离线建虚拟环境 / 起服务 / 打印访问提示
+# 构建时会被替换的占位符: __VERSION__ (包版本) · __UNIT__ (服务单元名, 默认 fonriv)
+set -u
+ROOT="${FONRIV_DEB_ROOT:-}"      # 仅测试用: 指向一个假根目录(此时不动 systemd)
+APP="${ROOT}/opt/fonriv"
+DATADIR="${ROOT}/var/lib/fonriv"
+CONF="${ROOT}/etc/fonriv/fonriv.conf"
+VENV="$APP/venv"
+UNIT="__UNIT__"
+PKGVER="__VERSION__"
+
+log(){ echo "[fonriv] $*"; }
+err(){ echo "[fonriv][错误] $*" >&2; }
+
+# ── 1. 数据目录 + 符号链接(升级不丢数据) ──
+mkdir -p "$DATADIR" 2>/dev/null || true
+chmod 0750 "$DATADIR" 2>/dev/null || true
+if [ ! -e "$APP/data" ]; then
+    ln -sfn "$DATADIR" "$APP/data" 2>/dev/null || true
+    log "数据目录: $DATADIR (已链接到 $APP/data)"
+fi
+
+# ── 2. 虚拟环境(必须复核 pip 真的在 —— 缺 python3-venv 时 python3 -m venv 会静静地不装 pip) ──
+if [ ! -x "$VENV/bin/python" ]; then
+    python3 -m venv "$VENV" 2>/dev/null || {
+        err "创建虚拟环境失败 —— 请先安装: apt-get install -y python3-venv python3-pip"
+        exit 1
+    }
+fi
+if [ ! -x "$VENV/bin/pip" ]; then
+    "$VENV/bin/python" -m ensurepip --upgrade >/dev/null 2>&1 || true
+fi
+if [ ! -x "$VENV/bin/pip" ]; then
+    err "虚拟环境里没有 pip —— 目标系统缺少 python3-venv(用 dpkg -i 安装时不会自动装依赖)。"
+    err "请执行: apt-get install -y python3-venv python3-pip && dpkg --configure -a 后重试。"
+    exit 1
+fi
+PYV=$("$VENV/bin/python" -c 'import sys;print("%d.%d"%sys.version_info[:2])' 2>/dev/null || echo "?")
+
+# ── 3. 装依赖: 离线优先(包内轮子) → 失败时给准确原因, 不静默 ──
+PIPLOG=$(mktemp /tmp/fonriv_pip_XXXXXX.log)
+if "$VENV/bin/pip" install --no-index --find-links="$APP/wheels" --upgrade \
+        -r "$APP/requirements.txt" >"$PIPLOG" 2>&1; then
+    log "依赖安装完成(离线, 包内轮子) · Python $PYV"
+else
+    err "离线安装依赖失败。pip 输出末尾:"
+    tail -n 12 "$PIPLOG" | sed 's/^/[fonriv]   /' >&2
+    # ABI 不匹配 = 最常见原因(包内轮子为本包目标版本构建, 与目标机 Python 不一致)
+    if grep -qE "not a supported wheel|No matching distribution|Could not find a version" "$PIPLOG"; then
+        whl=$(ls "$APP/wheels" 2>/dev/null | grep -oE 'cp3[0-9]+' | head -1)
+        err "原因: 包内依赖轮子是为 [${whl:-未知} / Ubuntu 22.04] 构建的, 而本机 Python 是 $PYV → 二进制不兼容。"
+        err "三种解决办法(任选):"
+        err "  ① 装匹配的解释器再装本包(推荐给客户机): apt-get install -y python3.10 python3.10-venv, 然后用 3.10 重装"
+        err "  ② 生成本机匹配的安装包: bash packaging/build_deb.sh --py $PYV"
+        err "  ③ 临时联网安装依赖: FONRIV_DEB_ALLOW_PIP_NETWORK=1 dpkg --configure $UNIT   (会从 PyPI 拉取)"
+    fi
+    if [ "${FONRIV_DEB_ALLOW_PIP_NETWORK:-0}" = "1" ]; then
+        log "已授权联网安装依赖, 正在从 PyPI 拉取…"
+        if "$VENV/bin/pip" install --upgrade -r "$APP/requirements.txt" >"$PIPLOG" 2>&1; then
+            log "依赖安装完成(联网)"
+        else
+            err "联网安装依赖仍失败。pip 输出末尾:"
+            tail -n 12 "$PIPLOG" | sed 's/^/[fonriv]   /' >&2
+            rm -f "$PIPLOG"; exit 1
+        fi
+    else
+        rm -f "$PIPLOG"
+        exit 1
+    fi
+fi
+rm -f "$PIPLOG"
+"$VENV/bin/python" - <<'PY' || { err "依赖复核失败(fastapi/uvicorn/cryptography 无法导入)"; exit 1; }
+import sys
+import fastapi, uvicorn, cryptography, croniter, websockets
+try:
+    import multipart
+except ImportError:
+    import python_multipart as multipart
+print("[fonriv] 依赖复核通过 · python", sys.version.split()[0], "· fastapi", fastapi.__version__)
+PY
+
+# ── 4. 权限 ──
+chmod 0750 "$APP" 2>/dev/null || true
+find "$APP" \( -name '*.pem' -o -name '*.key' \) -type f -exec chmod 0600 {} + 2>/dev/null || true
+chmod 0640 "$CONF" 2>/dev/null || true
+
+# ── 5. 依赖工具自检(只提示, 不阻塞) ──
+miss=""
+for c in rsync sshpass 7z mount.cifs mount.nfs; do
+    command -v "$c" >/dev/null 2>&1 || miss="$miss $c"
+done
+[ -n "$miss" ] && log "以下外部工具未安装(相关功能不可用, 可在 Web 界面「系统·依赖检查」一键安装):$miss"
+
+# ── 6. 启动服务 ──
+PORT=$(sed -n 's/^FONRIV_PORT=\([0-9]\{1,5\}\).*/\1/p' "$CONF" 2>/dev/null | head -1)
+[ -n "$PORT" ] || PORT=8000
+if [ -z "$ROOT" ] && command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    systemctl enable "$UNIT" >/dev/null 2>&1 || true
+    systemctl restart "$UNIT" >/dev/null 2>&1 || systemctl start "$UNIT" >/dev/null 2>&1 || true
+    sleep 4
+    if systemctl is-active --quiet "$UNIT"; then
+        log "服务已启动 ($UNIT.service)"
+        WEB=$("$VENV/bin/python" - "$PORT" <<'PY' 2>/dev/null
+import json, sys, urllib.request
+try:
+    with urllib.request.urlopen("http://127.0.0.1:%s/api/version" % sys.argv[1], timeout=6) as r:
+        print(json.load(r).get("version", ""))
+except Exception:
+    print("")
+PY
+)
+        if [ -n "$WEB" ]; then
+            if [ "$WEB" = "$PKGVER" ]; then log "页面探活成功 · 版本 $WEB"
+            else log "页面探活成功, 但版本串是 $WEB (包版本 $PKGVER) —— 请确认没有旧实例占用端口"; fi
+        else
+            err "服务已启动但接口无响应: 请查看 journalctl -u $UNIT -n 50 与 /var/log/$UNIT.log"
+        fi
+    else
+        err "服务未启动: 请查看 journalctl -u $UNIT -n 50 (常见原因: 端口被占用 / 数据目录权限)"
+    fi
+else
+    log "未检测到可用的 systemd(容器环境?): 请手工启动 $VENV/bin/python $APP/server.py"
+fi
+
+# ── 7. 访问提示 ──
+IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+[ -n "$IP" ] || IP=127.0.0.1
+cat <<EOF
+
+  ────────────────────────────────────────────────────────────────
+   Fonriv 安装完成 (版本 $PKGVER)
+
+   请在浏览器打开:   http://$IP:$PORT/
+   首次打开会引导你设置超级管理员账号与界面风格 ——
+   本系统不预置任何默认口令。
+
+   服务: systemctl status|restart $UNIT
+   配置: $CONF          数据: $DATADIR
+   日志: journalctl -u $UNIT -f       /var/log/$UNIT.log
+  ────────────────────────────────────────────────────────────────
+
+EOF
+exit 0

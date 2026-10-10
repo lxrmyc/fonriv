@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<!--
+  Fonriv · RDP / VNC / SSH 控制台 (v5.25.0, guacd 网关)
+
+  数据面: 浏览器 WS ↔ 自研桥 (backend/guacd_bridge.py) ↔ guacd ↔ 目标 RDP/VNC/SSH
+  渲染:   guacamole-common-js (本地入库, 非 CDN)
+
+  为什么需要它: 现代 Linux (Ubuntu 24.04+ GNOME 46) 的"桌面共享"已是 **RDP**,
+  Windows/macOS 也以 RDP 为主 —— 浏览器无法直连 RDP, 必须经 guacd 转换。
+
+  参数: proto=rdp|vnc|ssh, host, port, user, password, domain, security, width, height,
+        ignore_cert, recording, auth_token
+-->
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Fonriv · 远程控制台</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#0b0e14; overflow:hidden;
+               font-family: system-ui, -apple-system, "Noto Sans CJK SC", sans-serif; }
+  #bar { height:38px; display:flex; align-items:center; gap:10px; padding:0 12px;
+         background:#121722; color:#c8d2e0; font-size:12.5px; border-bottom:1px solid #232b3a; }
+  #bar .title { font-weight:600; color:#7fd1ff; }
+  #bar .spacer { flex:1 }
+  #bar button { background:#1d2534; color:#c8d2e0; border:1px solid #2b3546;
+                border-radius:5px; padding:4px 10px; font-size:12px; cursor:pointer }
+  #bar button:hover { background:#263041 }
+  #dot { width:8px; height:8px; border-radius:50%; background:#666 }
+  /* v5.98.14 · FIX(用户报: 连 WIN10 后最上面那排"最小化/最大化/关闭"看不见):
+     原为 flex 居中 + overflow:hidden —— 内容一旦比容器高就**上下一起被裁**(顶部正好是 Windows 标题栏);
+     改为 margin:auto 居中 + 可滚动: 装得下就居中, 装不下能滚到任意位置, 不丢内容。 */
+  #screen { position:absolute; top:72px; left:0; right:0; bottom:0;
+            display:flex; overflow:auto; }
+  #screen > * { margin:auto; }
+  .tb-key.sticky { background:#8b2f2f; border-color:#c05b5b; color:#fff }
+  #msg { position:absolute; inset:72px 0 0 0; display:flex; align-items:center;
+         justify-content:center; color:#9fb0c8; font-size:13.5px; text-align:center;
+         padding:24px; line-height:1.9; overflow:auto }
+  /* v5.31.0 · 消息卡片: 避免长文本被 flex 挤成窄列 */
+  #msg .msgbox { max-width:820px; width:100%; margin:auto; text-align:left;
+                 background:#121722; border:1px solid #232b3a; border-radius:10px;
+                 padding:18px 22px; box-shadow:0 6px 24px rgba(0,0,0,.35) }
+  #msg .msgbox.center { text-align:center; background:transparent; border:none; box-shadow:none }
+  #msg .msgbox b { color:#c8d2e0 }
+  #msg.err .msgbox { border-color:#5a2b2b }
+  #msg.err { color:#ff8f8f }
+  #msg code { background:#1d2534; padding:2px 6px; border-radius:4px; color:#7fd1ff }
+  /* v5.31.0 · 工具栏与快捷键条 */
+  #bar select { background:#1d2534; color:#c8d2e0; border:1px solid #2b3546; border-radius:5px; padding:3px 4px; font-size:12px }
+  #bar label { font-size:12px; display:inline-flex; align-items:center; gap:4px; color:#c8d2e0; cursor:pointer }
+  #keybar { height:34px; display:flex; align-items:center; gap:4px; padding:0 10px; overflow-x:auto;
+            background:#0f141d; border-bottom:1px solid #1d2534; white-space:nowrap }
+  #keybar .kb { background:#1a2130; color:#c8d2e0; border:1px solid #2b3546; border-radius:5px;
+                padding:3px 9px; font-size:11.5px; cursor:pointer; flex:0 0 auto }
+  #keybar .kb:hover { background:#26303f; border-color:#3a4657 }
+  #keybar .kb.mod.on { background:#8b2f2f; border-color:#c05b5b; color:#fff }
+  #keybar .kbsep { width:1px; height:18px; background:#2b3546; margin:0 4px; flex:0 0 auto }
+  #adv { display:none; padding:8px 12px; background:#0f141d; border-bottom:1px solid #1d2534; font-size:12px }
+  #adv .adv-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:6px 14px; color:#c8d2e0 }
+  #adv label { display:flex; align-items:center; gap:6px }
+  #adv input[type=text] { background:#1d2534; color:#c8d2e0; border:1px solid #2b3546; border-radius:4px; padding:3px 6px }
+  #adv select { background:#1d2534; color:#c8d2e0; border:1px solid #2b3546; border-radius:4px; padding:3px 4px }
+  #adv .adv-actions { margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+  #adv .btn-sm { background:#1d2534; color:#c8d2e0; border:1px solid #2b3546; border-radius:5px;
+                 padding:4px 10px; font-size:12px; cursor:pointer }
+  #adv .btn-sm:hover { background:#263041 }
+  #advMsg { color:#9fb0c8; font-size:11.5px }
+  body.fs #bar { position:fixed; top:0; left:0; right:0; z-index:20 }
+  body.fs #keybar { position:fixed; top:38px; left:0; right:0; z-index:20 }
+  body.fs #adv { position:fixed; top:72px; left:0; right:0; z-index:20 }
+  body.fs #screen { top:110px }
+  /* 显示层由 JS 创建 canvas; 居中默认 */
+  #screen > div { margin:0 auto; }
+</style>
+<script>
+/* v6.0.0 · 读取主界面主题偏好(rp_theme)同步到本页 */
+try{
+  var _t = localStorage.getItem('rp_theme') || 'dark';
+  if (_t === 'auto'){ _t = (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark'; }
+  document.documentElement.setAttribute('data-theme', _t);
+}catch(_){}
+</script>
+<!-- v6.3.28 · 与主界面共用的主题化模态基建(独立页, 无 {{APP_VERSION}} 模板;
+     /static/* 由服务端按 no-cache, must-revalidate 下发, 故无需版本串防缓存) -->
+<script src="/static/rp_dialogs.js"></script>
+</head>
+<body>
+<div id="bar">
+  <span id="dot"></span>
+  <span class="title" id="ttl">远程控制台</span>
+  <span class="spacer"></span>
+
+  <select id="tbRes" title="远程桌面分辨率 (发送后远端会重新协商)">
+    <option value="">分辨率…</option>
+    <option value="__fitwin">自适应 (跟随窗口)</option>
+    <option value="1024x768">1024×768</option>
+    <option value="1280x720">1280×720</option>
+    <option value="1280x800">1280×800</option>
+    <option value="1366x768">1366×768</option>
+    <option value="1440x900">1440×900</option>
+    <option value="1600x900">1600×900</option>
+    <option value="1680x1050">1680×1050</option>
+    <option value="1920x1080">1920×1080 (全高清)</option>
+    <option value="1920x1200">1920×1200</option>
+    <option value="2560x1440">2560×1440 (2K)</option>
+    <option value="3840x2160">3840×2160 (4K)</option>
+    <option value="__custom">自定义…</option>
+  </select>
+  <select id="tbAudio" title="音频输出模式 (需重连生效)">
+    <option value="local">🔊 本机播放</option>
+    <option value="remote">🖥 远端发声</option>
+    <option value="off">🔇 静音</option>
+  </select>
+  <button id="fitBtn" onclick="toggleFit()" title="适应窗口 / 原始大小">适应窗口</button>
+  <button onclick="toggleFullscreen()" id="fsBtn" title="全屏 (F11 / Esc 退出)">⛶ 全屏</button>
+  <label title="只读: 只看画面, 不发送键鼠"><input type="checkbox" id="tbRO">👁 只读</label>
+  <button onclick="toggleAdv()" id="advBtn" title="画质/剪贴板/驱动等连接参数">⚙ 高级</button>
+  <button onclick="fsToggle()" id="fsBtn2" title="文件传输: 浏览远端目录 / 上传下载 (SFTP 通道, 也可直接拖拽文件到画面)">📁 文件</button>
+  <button onclick="reconnect()" title="断开并重新连接">⟳ 重连</button>
+  <button onclick="history.length > 1 ? history.back() : (location.href='/')">⟵ 返回</button>
+</div>
+
+<div id="keybar" title="粘滞修饰键: 点亮后按字母键即发组合键; 再点一下取消">
+  <button class="kb" onclick="tapKey(0xFF1B)">Esc</button>
+  <button class="kb" onclick="tapKey(0xFF09)">Tab</button>
+  <button class="kb" onclick="tapKey(0xFF0D)">Enter</button>
+  <button class="kb" onclick="tapKey(0xFF08)">⌫</button>
+  <span class="kbsep"></span>
+  <button class="kb mod" id="k_0xFFE3" onclick="tapMod(0xFFE3,this)">Ctrl</button>
+  <button class="kb mod" id="k_0xFFE1" onclick="tapMod(0xFFE1,this)">Shift</button>
+  <button class="kb mod" id="k_0xFFE9" onclick="tapMod(0xFFE9,this)">Alt</button>
+  <button class="kb mod" id="k_0xFFEB" onclick="tapMod(0xFFEB,this)">Win</button>
+  <span class="kbsep"></span>
+  <button class="kb" onclick="combo([0xFFE3,0x63])" title="Ctrl+C 复制">Ctrl+C</button>
+  <button class="kb" onclick="combo([0xFFE3,0x76])" title="Ctrl+V 粘贴">Ctrl+V</button>
+  <button class="kb" onclick="combo([0xFFE3,0x78])" title="Ctrl+X 剪切">Ctrl+X</button>
+  <button class="kb" onclick="combo([0xFFE3,0x61])" title="Ctrl+A 全选">Ctrl+A</button>
+  <button class="kb" onclick="combo([0xFFE3,0x7A])" title="Ctrl+Z 撤销">Ctrl+Z</button>
+  <button class="kb" onclick="combo([0xFFE3,0xFFE1,0x76])" title="Ctrl+Shift+V 粘贴为纯文本">Ctrl+Shift+V</button>
+  <button class="kb" onclick="combo([0xFFE9,0xFF09])" title="Alt+Tab 切换窗口">Alt+Tab</button>
+  <button class="kb" onclick="combo([0xFFE3,0xFFE9,0xFFFF])" title="Ctrl+Alt+Del 安全选项">Ctrl+Alt+Del</button>
+  <button class="kb" onclick="combo([0xFFEB,0x64])" title="Win+D 显示桌面">Win+D</button>
+  <button class="kb" onclick="combo([0xFFEB,0x65])" title="Win+E 资源管理器">Win+E</button>
+  <button class="kb" onclick="combo([0xFFEB,0x72])" title="Win+R 运行">Win+R</button>
+  <button class="kb" onclick="combo([0xFFEB,0x6C])" title="Win+L 锁屏">Win+L</button>
+  <span class="kbsep"></span>
+  <button class="kb" onclick="clipboard()" title="把本机剪贴板内容发送到远端">📋 发送剪贴板</button>
+</div>
+
+<div id="adv">
+  <div class="adv-grid">
+    <label><input type="checkbox" id="pWallpaper"> 远端壁纸 (关=更流畅)</label>
+    <label><input type="checkbox" id="pFontSmooth" checked> 字体平滑</label>
+    <label><input type="checkbox" id="pTheming"> 窗口主题特效</label>
+    <label><input type="checkbox" id="pLocalCursor" checked> 本地光标 (更跟手)</label>
+    <label><input type="checkbox" id="pDrive"> 文件传输通道 (本地目录挂到远端)</label>
+    <label><input type="checkbox" id="pForceNew"> 强制新建会话 (Linux 残留会话时勾)</label>
+    <label title="跨多屏铺开 (需 guacd 1.6.1+ 服务端; 旧版自动忽略)"><input type="checkbox" id="pMultiMon"> 🖥 多显示器</label>
+    <label><input type="checkbox" id="pBitmapCache" checked> 位图缓存 (加速)</label>
+    <label><input type="checkbox" id="pSwapRedBlue"> VNC 交换红蓝 (颜色不对时勾)</label>
+    <label>色深 <select id="pColorDepth"><option value="24">24 位 (最佳画质)</option><option value="16">16 位 (较流畅)</option><option value="8">8 位 (最流畅)</option></select></label>
+    <label>安全模式 <select id="pSecurity">
+      <option value="">自动 (推荐)</option><option value="any">任意</option><option value="nla">NLA</option>
+      <option value="tls">TLS</option><option value="rdp">RDP 标准</option></select></label>
+    <label>画质 <select id="pQuality"><option value="best">最佳</option><option value="balanced">均衡</option><option value="fast">最快</option></select></label>
+    <label>驱动目录 <input type="text" id="pDrivePath" placeholder="/tmp/fonriv_drive" size="18"></label>
+  </div>
+  <div class="adv-actions">
+    <button class="btn-sm" onclick="advApply()">应用并重连</button>
+    <button class="btn-sm" onclick="advPreset('best')">画质优先</button>
+    <button class="btn-sm" onclick="advPreset('fast')">速度优先</button>
+    <button class="btn-sm" onclick="advPreset('compat')">兼容优先</button>
+    <span id="advMsg"></span>
+  </div>
+</div>
+
+<div id="screen"></div>
+<div id="msg">正在连接…</div>
+
+<script src="/static/vendor/guacamole/all.min.js"></script>
+<script>
+const qs    = new URLSearchParams(location.search);
+const PROTO = (qs.get('proto') || 'rdp').toLowerCase();
+const HOST  = qs.get('host') || '';
+const PORT  = qs.get('port') || (PROTO === 'rdp' ? '3389' : PROTO === 'ssh' ? '22' : '5900');
+/* v5.31.5 · FIX (远程桌面连不上的真正原因): 原来只从 URL 取 auth_token,
+   而用户直接打开/收藏/分享的 guac.html 链接里通常没有该参数 (或已过期) →
+   桥层鉴权失败回 `769 会话已失效` 并立即关闭 → 客户端永远停在"连接中"(amber),
+   页面只显示笼统的等待提示, 极难定位。
+   实测对照: 页面内直开带 token 的同一 WS → ready/size(0,1280,800)/img/blob 全部正常。
+   现回退到 localStorage 里的登录 token (与 app.js 同一来源)。*/
+const TOKEN = qs.get('auth_token') || localStorage.getItem('auth_token') || '';
+
+const msgEl = document.getElementById('msg');
+const dot   = document.getElementById('dot');
+let client = null, display = null, fit = false, RECONN = 0, manual = false;
+
+document.getElementById('ttl').textContent =
+  `控制台 · ${PROTO.toUpperCase()} ${HOST}:${PORT}`;
+
+function setMsg(t, isErr){
+  if (!t){ msgEl.style.display = 'none'; return; }
+  msgEl.style.display = 'flex';
+  msgEl.className = isErr ? 'err' : '';
+  // 短提示居中直显; 长文本 (错误/排查指引) 用卡片承载, 保证可读性
+  const isLong = String(t).replace(/<[^>]+>/g, '').length > 60 || String(t).indexOf('<br') >= 0;
+  msgEl.innerHTML = isLong ? '<div class="msgbox">' + t + '</div>'
+                           : '<div class="msgbox center">' + t + '</div>';
+}
+function setDot(c){ dot.style.background = c; }
+
+/* v5.30.0 · 轻提示 (自动消失, 不打断操作) */
+let _toastT = null;
+function showToast(t){
+  let el = document.getElementById('gtoast');
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'gtoast';
+    el.style.cssText = 'position:fixed;top:46px;right:12px;z-index:99;background:#1d2534;color:#c8d2e0;'
+      + 'border:1px solid #2b3546;border-radius:6px;padding:6px 12px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.4);transition:opacity .4s';
+    document.body.appendChild(el);
+  }
+  el.textContent = t;
+  el.style.opacity = '1';
+  clearTimeout(_toastT);
+  _toastT = setTimeout(() => { el.style.opacity = '0'; }, 2600);
+}
+
+/* 浏览器侧 WS 地址: 主通道 + guacd=1 → 服务端以 "guacamole" 子协议 accept */
+function wsUrl(){
+  /* v6.16.2 批23 · 凭据安全: 目标/账号密码都在服务端「一次性工单」里, WS 只带 ticket
+     (旧流程把 user/password 拼进 URL —— 浏览器地址栏/历史记录/服务端访问日志三处泄漏)。
+     非敏感的本地显示偏好(色深/质量/音频等)仍随 WS 传递。 */
+  const ticket = qs.get('ticket') || '';
+  const p = new URLSearchParams({ guacd: '1' });
+  if (ticket) p.set('ticket', ticket);
+  ['security','width','height','depth','recording',
+   'ignore_cert','wallpaper','read_only','authtype','drive','drive_path','timezone',
+   'audio','quality','color_depth','font_smooth','theming','bitmap_cache',
+   'local_cursor','swap_red_blue','console','disable_copy','disable_paste'
+  ].forEach(function(k){ const v = qs.get(k); if (v) p.set(k, v); });
+  // v5.31.0 · 高级面板的偏好优先覆盖 URL 参数 (用户在本页改的即时生效)
+  try {
+    const adv = advGather();
+    const map = {
+      wallpaper: adv.wallpaper ? '1' : '0',
+      font_smooth: adv.font_smooth ? '1' : '0',
+      theming: adv.theming ? '1' : '0',
+      color_depth: adv.color_depth || '24',
+      bitmap_cache: adv.bitmap_cache ? '1' : '0',
+      local_cursor: adv.local_cursor ? '1' : '0',
+      swap_red_blue: adv.swap_red_blue ? '1' : '0',
+      drive: adv.drive ? '1' : '0',
+      drive_path: adv.drive_path || '',
+      quality: adv.quality || '',
+      multi_monitor: adv.multi_monitor ? '1' : '',
+    };
+    if (adv.security) map.security = adv.security;
+    Object.keys(map).forEach(function(k){ if (map[k] !== '' && map[k] != null) p.set(k, map[k]); });
+    if (adv.force_new) p.set('force_new', '1');
+  } catch(e){}
+  const audioEl = document.getElementById('tbAudio');
+  if (audioEl && audioEl.value) p.set('audio', audioEl.value);
+  if (!ticket && TOKEN) p.set('auth_token', TOKEN);   // 仅旧入口垫片; 工单流程凭据在服务端
+  const proto = (location.protocol === 'https:' ? 'wss' : 'ws');
+  return proto + '://' + location.host + '/ws?' + p.toString();
+}
+
+/* v5.31.0 · 初始化工具栏 (事件绑定 + 恢复偏好) */
+function initToolbar(){
+  advLoad();
+  const audioEl = document.getElementById('tbAudio');
+  if (audioEl) {
+    audioEl.value = qs.get('audio') || 'local';
+    audioEl.addEventListener('change', function(){ audioChange(this.value); });
+  }
+  const resEl = document.getElementById('tbRes');
+  if (resEl) {
+    resEl.addEventListener('change', function(){ resChange(this.value); });
+    let last = ''; try { last = localStorage.getItem('guac_last_res') || ''; } catch(e){}
+    const want = qs.get('width') && qs.get('height') ? (qs.get('width') + 'x' + qs.get('height')) : last;
+    if (want) {
+      const opt = Array.prototype.find.call(resEl.options, function(o){ return o.value === want; });
+      if (opt) resEl.value = want;
+    }
+  }
+  const roEl = document.getElementById('tbRO');
+  if (roEl) roEl.addEventListener('change', function(){ roChange(this.checked); });
+}
+
+function connect(){
+  setDot('#e8b44a');
+  setMsg('正在连接 ' + PROTO.toUpperCase() + ' ' + HOST + ':' + PORT + ' …');
+  const tunnel = new Guacamole.WebSocketTunnel(wsUrl());
+  client = new Guacamole.Client(tunnel);
+  display = document.getElementById('screen');
+  display.innerHTML = '';
+  display.appendChild(client.getDisplay().getElement());
+  /* v5.31.0 · 远端分辨率一确定/变化就自动缩放适配 (修"必须手点居中拉伸") */
+  try {
+    client.getDisplay().onresize = function(w, h){ scheduleFit(); };
+  } catch(e){}
+  _fitRetry = 0;
+
+  // 握手期错误 / 运行期错误都从这里出来 (v5.30.0: 服务端桥已把 guacd 状态码翻译成中文)
+  client.onerror = function(status){
+    sawError = true;                    // v5.31.0 · 已展示明确错误 → 不再被"等待画面"提示覆盖
+    setDot('#ff5f5f');
+    const code = status && status.code;
+    let why = (status && status.message) || '未知错误';
+    // JS 侧兜底翻译 (桥已翻过一次, 这里覆盖 unknown/原始码场景)
+    const ZH = {0x0100:'不支持的操作',0x0200:'服务端内部错误',0x0202:'上游连接超时',
+      0x0203:'上游返回错误',0x0207:'目标主机不可达 (地址/端口错误)',0x0208:'远端拒绝连接 (远程桌面未开启?)',
+      0x0209:'会话冲突',0x020A:'会话超时',0x020B:'会话已关闭',0x0301:'认证失败 (用户名或密码错误)',
+      0x0303:'没有权限 (账户被禁止远程访问)',0x0308:'客户端超时',0x030D:'画面数据过大',0x031D:'并发会话数达上限'};
+    if (code && ZH[code] && !new RegExp(ZH[code].slice(0,4)).test(why)) why = ZH[code] + ': ' + why;
+    setMsg(hint(why) + '<br><br><span style="color:#9fb0c8;font-size:12px">协议: ' + PROTO +
+           ' · 目标: ' + HOST + ':' + PORT + (code ? ' · 错误码 0x' + code.toString(16) : '') + '</span>', true);
+    if (!manual && RECONN < 3){ RECONN++; setTimeout(reconnect, 3000); }
+  };
+  // v5.38.0 · P1.1 SFTP 文件系统句柄 (guacd 下发 → 供 📁 文件面板使用)
+  try {
+    client.onfilesystem = function(object, name){
+      _fs = object;
+      fsStat('✓ 文件系统就绪: ' + name);
+    };
+  } catch(e){}
+  client.onstatechange = function(state){
+    // 3 = CONNECTED, 5 = DISCONNECTED (Guacamole.Client.State)
+    if (state === 3){
+      sawSync = true; setDot('#54d18c'); setMsg(''); scheduleFit();
+      /* v5.98.14 · 自适应: 面板选了「自适应(跟随浏览器窗口)」→ 首帧到达后再下发尺寸
+         (握手期下发会踩"画布已清空但服务端未重绘"的黑屏时序坑, 见下方 v5.31.0 注释) */
+      if (qs.get('fit') === '1'){
+        _fitWin = true;
+        const rsel = document.getElementById('tbRes');
+        if (rsel) rsel.value = '__fitwin';
+        setTimeout(_fitWinSend, 600);
+      }
+    }
+    else if (state === 5 && !manual){
+      setDot('#e8b44a');
+      if (RECONN < 3){ RECONN++; setMsg('连接已断开 — 3 秒后自动重连 (第 ' + RECONN + '/3 次)…'); setTimeout(reconnect, 3000); }
+      else setMsg('连接已断开 (重连次数已用尽, 点「重连」手动重试)', true);
+    }
+  };
+  sawSync = false;
+  sawError = false;
+  startStallWatch();
+  startSyncWatch();
+  /* v5.31.5 · 自动 flush 补偿 —— 库的设计: size/img 等显示操作进队列, 收到 sync 才渲染。
+     RDP 会话若中途被对端中止(安全协商失败等), sync 永远不来 → 已排队的帧(如 xorg 登录界面)
+     永远不渲染 → 黑屏; 用户手动点缩放才触发渲染 —— 这就是"点居中拉伸才出画面"的机制。
+     这里周期性补一次 flush: 有排队的帧就渲染出来, 不再依赖 sync。 */
+  if (window.__flushTimer) clearInterval(window.__flushTimer);
+  window.__flushTimer = setInterval(function(){
+    if (!client) return;
+    const d = client.getDisplay();
+    if (d.getWidth() > 0) return;              // 已正常渲染, 无需补偿
+    try { d.flush(); } catch(e){}
+  }, 1500);
+  client.connect('');
+  /* v5.30.0 · 剪贴板双向自动同步 (参考官方 webapp 行为):
+     远端复制 → onclipboard 读流写本机; 本机复制/聚焦 → readText 发流给远端 */
+  client.onclipboard = function(stream, mimetype){
+    if ((mimetype || 'text/plain').indexOf('text') !== 0) return;   // 只同步文本 (图片按需扩展)
+    const reader = new Guacamole.StringReader(stream);
+    let text = '';
+    reader.ontext = t => { text += t; };
+    reader.onend = () => {
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText)
+        navigator.clipboard.writeText(text).then(()=>showToast('📋 远端剪贴板已同步到本机 (' + text.length + ' 字符)'))
+          .catch(()=>{ /* 无权限 (非 HTTPS/未交互) 时静默, 手动按钮仍可用 */ });
+    };
+  };
+  let lastSent = '';
+  function sendLocalClipboard(){
+    if (!navigator.clipboard || !navigator.clipboard.readText || !client) return;
+    navigator.clipboard.readText().then(t => {
+      if (!t || t === lastSent) return;           // 内容没变不重发
+      lastSent = t;
+      const s = client.createClipboardStream('text/plain');
+      const wr = new Guacamole.StringWriter(s);
+      wr.sendText(t); wr.sendEnd();
+      showToast('📋 本机剪贴板已同步到远端 (' + t.length + ' 字符)');
+    }).catch(()=>{});
+  }
+  window.addEventListener('focus', () => { if (client) sendLocalClipboard(); });
+  document.addEventListener('copy', () => setTimeout(sendLocalClipboard, 60));
+  document.addEventListener('cut',  () => setTimeout(sendLocalClipboard, 60));
+  /* v5.30.0 · 音频: AudioContext 需用户手势解锁 (浏览器 autoplay 政策)。
+     任意点击后远端音频流才能出声 — 首次点击做一次全局解锁并提示。 */
+  let audioUnlocked = false;
+  document.addEventListener('click', function unlock(){
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    try { const ac = new (window.AudioContext || window.webkitAudioContext)(); ac.resume().then(()=>ac.close()); } catch(e){}
+    document.removeEventListener('click', unlock);
+  });
+  /* v5.30.0 · nop 心跳: 25s 一条, 保中间设备不断流 (桥与 guacd 均按官方协议忽略/回应) */
+  client._nopTimer = setInterval(() => {
+    try { tunnel.send('5.nop;'); } catch(e){}
+  }, 25000);
+  // 键鼠: 让 guacamole 接管键盘事件
+  const kbd = new Guacamole.Keyboard(document);
+  kbd.onkeydown = s => { try { client.sendKeyEvent(1, s); return false; } catch(e){} };
+  kbd.onkeyup   = s => { try { client.sendKeyEvent(0, s); return false; } catch(e){} };
+  /* v5.26.0 · 鼠标: 自己算坐标 (官方 Position.fromClientPosition 不除 CSS 缩放 → 偏移) */
+  const dispEl = client.getDisplay().getElement();
+  let _btn = { left: false, middle: false, right: false };
+  function sendMouse(e, extra){
+    let x, y;
+    try { const r = dispEl.getBoundingClientRect();
+          x = Math.round((e.clientX - r.left) / (scale || 1));
+          y = Math.round((e.clientY - r.top) / (scale || 1)); } catch (err) { return; }
+    if (x < 0 || y < 0) return;
+    try {
+      client.sendMouseState(new Guacamole.Mouse.State({
+        x: x, y: y, left: _btn.left, middle: _btn.middle, right: _btn.right,
+        up: !!(extra && extra.up), down: !!(extra && extra.down) }));
+    } catch (err) {}
+  }
+  const _MD = { 0: 'left', 1: 'middle', 2: 'right' };
+  dispEl.addEventListener('mousemove', e => sendMouse(e));
+  dispEl.addEventListener('mousedown', e => { _btn[_MD[e.button]] = true; sendMouse(e); e.preventDefault(); });
+  dispEl.addEventListener('mouseup',   e => { _btn[_MD[e.button]] = false; sendMouse(e); e.preventDefault(); });
+  dispEl.addEventListener('contextmenu', e => e.preventDefault());
+  dispEl.addEventListener('wheel', e => {
+    sendMouse(e, e.deltaY < 0 ? { up: true } : { down: true });
+    setTimeout(() => sendMouse(e), 60);
+  }, { passive: true });
+}
+
+function hint(why){
+  const w = why || '';
+  if (/guacd 不可达/.test(w)) return w + '<br><br>部署 guacd: <code>apt install guacd</code> (Ubuntu ≤25.04/Debian) 或 <code>docker run -d -p 4822:4822 guacamole/guacd</code>';
+  if (/认证|password|credential/i.test(w)) return w + '<br><br>请确认用户名/密码; Windows 域账号需填「域」; Linux RDP (xrdp) 用系统账号。';
+  if (/hostname|resolve|connect|unreachable|refus/i.test(w)) return w + '<br><br>请确认目标已开启远程桌面且端口可达 (RDP 3389 / VNC 5900 / SSH 22)。';
+  if (/Wayland/i.test(w)) return w;
+  return w;
+}
+
+/* v5.31.0 · 连接后不再主动 sendSize —— 这是"黑屏必须点居中拉伸才出画面"的根因:
+   客户端一发 size, 服务端会按新尺寸重排, 而本地画布在 resize 时会被清空;
+   两者时序错开就出现"画布已清空但服务端未重绘" → 全黑; 之后点「居中/拉伸」
+   触发 scale() 恰好落在重绘之后, 于是画面出现。
+   现改为: 远端分辨率由连接参数决定, 本地只做缩放适配; 仅当用户显式选分辨率时才 sendSize。*/
+function resize(){ scheduleFit(); }
+
+/* 分辨率确定/变化即自动适配 (autofit 的触发点: display.onresize) */
+let _fitTimer = null;
+function scheduleFit(){
+  if (_fitTimer) clearTimeout(_fitTimer);
+  _fitTimer = setTimeout(function(){ _fitTimer = null; applyFit(); }, 60);
+}
+window.addEventListener('resize', () => { if (client) applyFit(); });
+
+function sendCad(){ try { client.sendKeyEvent(1, 0xFFE3); client.sendKeyEvent(1, 0xFFE9); client.sendKeyEvent(1, 0xFFFF); client.sendKeyEvent(0, 0xFFFF); client.sendKeyEvent(0, 0xFFE9); client.sendKeyEvent(0, 0xFFE3); } catch(e){ alert('未连接'); } }
+function clipboard(){
+  if (!navigator.clipboard || !navigator.clipboard.readText){ alert('浏览器不支持剪贴板读取 (需 HTTPS 或 localhost)'); return; }
+  // v5.30.0 · 手动按钮 = 强制全量重发 (绕过内容去重)
+  navigator.clipboard.readText().then(t => {
+    const s = client.createClipboardStream('text/plain');
+    const wr = new Guacamole.StringWriter(s);
+    wr.sendText(t); wr.sendEnd();
+    showToast('📋 已发送 ' + t.length + ' 字符到远端剪贴板');
+  }).catch(e => alert('读取剪贴板失败: ' + e.message));
+}
+
+/* v5.26.0 · 缩放 (适应窗口) */
+let scale = 1, fitMode = true, _fitRetry = 0;
+function applyFit(){
+  if (!client) return;
+  const d = client.getDisplay();
+  const dw = d.getWidth(), dh = d.getHeight();
+  if (!dw || !dh){
+    // 远端尺寸尚未确定 → 短轮询重试 (最多 ~6s), 保证一有尺寸就自动适配, 不必手动点
+    if (_fitRetry < 30){ _fitRetry++; setTimeout(applyFit, 200); }
+    return;
+  }
+  _fitRetry = 0;
+  /* v5.98.14 · FIX: 原来用 innerHeight-46 估算可用高度, 而容器实际是 top:72px 起
+     (bar 38 + keybar 34) → 高估 26px, 缩放后画面仍高出容器 ~26px, 被裁掉的正好是顶部标题栏。
+     改为**量容器自身**的 clientWidth/clientHeight。 */
+  const box = document.getElementById('screen');
+  const availW = (box ? box.clientWidth : window.innerWidth) - 2;
+  const availH = (box ? box.clientHeight : window.innerHeight - 72) - 2;
+  if (fitMode) { const k = Math.min(availW / dw, availH / dh, 1); scale = k > 0.1 ? k : 1; d.scale(scale); }
+  else { scale = 1; d.scale(1); }
+  const b = document.getElementById('fitBtn');
+  if (b) b.textContent = fitMode ? '适应窗口' : '原始大小';
+}
+function toggleFit(){ fitMode = !fitMode; applyFit(); }
+window.addEventListener('resize', applyFit);
+
+/* v5.26.0 · 无画面诊断 (实测: Windows 空密码账户在 security=any(NLA) 下服务端会
+   索要密码且不发 sync → 客户端永远停在"正在连接"、画面全黑; 改 security=tls 即通) */
+let sawSync = false, retriedTls = false, syncTimer = null, sawError = false;
+/* v5.31.0 · 首帧等待: 不再 8s 就盲切 TLS 重连 (会把服务端看门狗计时重置, 用户体验更乱)。
+   改为: ① 用户已显式指定安全模式时, 尊重选择, 只提示"等待画面";
+        ② 未指定时, 给 15s 宽限再自动尝试 TLS 一次;
+        ③ 服务端 12s 看门狗会下发明确诊断, 由 onerror 展示。 */
+/* v5.31.0 · 客户端失速检测 (黑屏可诊断化的关键):
+   实测 guacamole-common-js 在会话建立后若服务端不下发 size/图像, 客户端显示尺寸恒为 0x0
+   (表现为全黑), 且服务端的 error 指令在该状态下不一定会触发 onerror。
+   这里用「显示尺寸是否已确定」直接判定, 12s 未确定即给出可执行的排查指引, 不再让用户干等。*/
+function startStallWatch(){
+  setTimeout(function(){
+    if (sawSync || manual || sawError) return;
+    const d = client && client.getDisplay ? client.getDisplay() : null;
+    if (d && d.getWidth() > 0 && d.getHeight() > 0) return;   // 已有尺寸 = 正常
+    sawError = true;
+    setDot('#ff9f43');
+    const sec = qs.get('security') || '自动';
+    setMsg(
+      '<b>连接已建立, 但远端始终未下发画面</b> (静默黑屏)<br><br>'
+      + '按可能性排查:<br>'
+      + '① <b>账号或密码不对</b> —— RDP 认证失败时 guacd 仍报「已连接」, 但不会给画面 (最常见)<br>'
+      + '② <b>换安全模式</b>: Windows 试 <b>TLS</b>; Linux (xrdp / GNOME 远程桌面) 试 <b>NLA</b> 或 <b>TLS</b><br>'
+      + '③ Linux 目标需该账号<b>已在桌面会话中登录</b>, 或勾选「强制新建会话」<br>'
+      + '④ 域账号需填「域」; 已有其它活动会话也会导致黑屏<br><br>'
+      + '<span style="color:#9fb0c8;font-size:12px">当前安全模式: ' + sec
+      + ' · 目标: ' + HOST + ':' + PORT + ' · 协议: ' + PROTO.toUpperCase()
+      + '<br>点「⚙ 高级」可切换安全模式/画质, 改完点「应用并重连」立即重试</span>', true);
+  }, 12000);
+}
+
+function startSyncWatch(){
+  const explicitSec = qs.get('security') || '';
+  syncTimer = setTimeout(function(){
+    if (manual || sawSync || sawError) return;   // 已有明确错误 → 不覆盖诊断
+    if (explicitSec){
+      setMsg('已连接, 正在等待远端下发画面…<br><span style="color:#9fb0c8;font-size:12px">'
+        + '若长时间黑屏, 服务端会自动给出原因; 也可点「⚙ 高级」换安全模式后「应用并重连」</span>');
+      return;
+    }
+    if (retriedTls) return;
+    retriedTls = true;
+    try { localStorage.setItem('rp_rdp_sec_hint', 'tls'); } catch (e) {}
+    setMsg('远端未下发画面 — 正在改用 <b>TLS</b> 安全模式重试…');
+    setTimeout(reconnect, 800);
+  }, 15000);
+}
+function noFrameHint(extra){
+  const d = '协议 ' + PROTO.toUpperCase() + ' · 目标 ' + HOST + ':' + PORT + (extra ? (' · ' + extra) : '');
+  if (PROTO === 'rdp') return '连接建立但<b>远端未返回画面</b> —— 按下面顺序排查:<br>'
+    + '① <b>改用「TLS」安全模式</b> (最常见): Windows 空密码账号在 NLA 下会被要求交互补凭据, 表现为一直"正在连接"、全黑<br>'
+    + '② 给该账号设个密码, 或在目标机 secpol.msc 关闭「账户: 使用空密码的本地账户只允许进行控制台登录」<br>'
+    + '③ 该账号需在「远程桌面用户」组 (非管理员账号)<br>'
+    + '④ Linux xrdp: 该账号已有残留会话 → 勾「强制新建会话」重连<br>'
+    + '<span style="color:#9fb0c8;font-size:12px">' + d + '</span>';
+  return '连接建立但远端未返回画面。<br><span style="color:#9fb0c8;font-size:12px">' + d + '</span>';
+}
+
+function reconnect(){
+  manual = true;
+  try { if (client && client._nopTimer) clearInterval(client._nopTimer); } catch(e){}
+  try { if (client) client.disconnect(); } catch(e){}
+  client = null;
+  setTimeout(() => { manual = false; connect(); }, 200);
+}
+
+/* v6.16.14 · 关窗即断(用户实测: 关闭控制台窗口后会话仍挂在后台, 目标机侧表现为"多个用户登录"):
+   关闭/离开页面时**立即断开** —— 置 manual 阻止自动重连(3 次重连逻辑), client.disconnect()
+   发出断开指令并关闭 WS; 桥接器(guacd_bridge)检测到 WS 断开即取消转发、关闭 guacd 连接,
+   目标机侧会话随即从"活动"转为"已断开"。
+   说明: RDP 协议没有"注销登录"指令, 控制台**无法**替用户在目标机执行注销(那必须在目标机上
+   执行 logoff / 配组策略清理断开会话); 这里保证的是"关窗即释放连接", 不再留下活动会话。 */
+function _consoleGracefulClose(){
+  manual = true;
+  try { if (client) client.disconnect(); } catch(e){}
+  try { const tn = client && client.getTunnel && client.getTunnel(); if (tn && tn.disconnect) tn.disconnect(); } catch(e){}
+}
+window.addEventListener('pagehide', _consoleGracefulClose);
+window.addEventListener('beforeunload', _consoleGracefulClose);
+/* v5.28.0 · 常用快捷键 / 粘滞修饰键 / 音频 / 只读 */
+const sticky = {};
+const MOD_IDS = { '0xFFE3':'k_0xFFE3', '0xFFE9':'k_0xFFE9', '0xFFE1':'k_0xFFE1', '0xFFEB':'k_0xFFEB' };
+function isRO(){ const e = document.getElementById('tbRO'); return !!(e && e.checked); }
+function keyDown(ks){ if (isRO()) return; try { client.sendKeyEvent(1, ks); } catch(e){} }
+function keyUp(ks){ if (isRO()) return; try { client.sendKeyEvent(0, ks); } catch(e){} }
+function tapMod(ks, btn){
+  const id = String(ks);
+  sticky[id] = !sticky[id];
+  if (sticky[id]) keyDown(ks); else keyUp(ks);
+  const b = document.getElementById('k_' + id);
+  if (b) b.classList.toggle('on', !!sticky[id]);
+}
+/* v5.31.0 · 一键组合键: 依次按下 → 释放 (粘滞的修饰键先释放, 避免粘住) */
+function combo(keys){
+  if (isRO()) return;
+  keys.forEach(function(k){ keyDown(k); });
+  setTimeout(function(){
+    for (let i = keys.length - 1; i >= 0; i--) keyUp(keys[i]);
+    // 清掉粘滞态, 避免 Ctrl 一直按着
+    for (const id in sticky) if (sticky[id]) {
+      const n = Number(id);
+      if (n === 0xFFE3 || n === 0xFFE1 || n === 0xFFE9 || n === 0xFFEB || n === 0xFFE7) {
+        keyUp(n); sticky[id] = false;
+        const b = document.getElementById('k_' + id); if (b) b.classList.remove('on');
+      }
+    }
+  }, 90);
+}
+function tapKey(ks){
+  keyDown(ks); setTimeout(function(){ keyUp(ks); }, 80);
+  for (const id in sticky) if (sticky[id]) {
+    keyUp(Number(id)); sticky[id] = false;
+    const b = document.getElementById('k_' + id); if (b) b.classList.remove('on');
+  }
+}
+async function audioChange(v){
+  if (!client) return;
+  /* v6.3.28 · 原为原生 confirm → 与主界面共用的主题化模态 */
+  if (await rpConfirm({ title:'音频输出模式', okText:'立即重连',
+      body:'音频输出模式需重连生效。立即重连?' })) {
+    manual = true; try{ client.disconnect(); }catch(e){} client = null; setTimeout(connect, 200);
+  }
+}
+/* 分辨率: 用户显式选择时才发 size (连接后自动适配不再主动发, 见 resize 注释) */
+/* v5.98.14 · 自适应: 按控制台容器实际大小计算(扣掉工具条), 并在窗口变化时跟随。 */
+let _fitWin = false, _fitWinTimer = null;
+function fitWinSize(){
+  const box = document.getElementById('screen');
+  const w = Math.max(640, (box ? box.clientWidth : window.innerWidth) - 2);
+  const h = Math.max(480, (box ? box.clientHeight : window.innerHeight - 72) - 2);
+  return [w, h];
+}
+function _fitWinSend(){
+  // 只在首帧已到(sawSync)后下发 —— 握手期 sendSize 会踩"画布清空但服务端未重绘"的黑屏时序坑(见下方注释)
+  if (!_fitWin || !client || typeof sawSync === 'undefined' || !sawSync) return;
+  const wh = fitWinSize();
+  try { client.sendSize(wh[0], wh[1]); } catch(e){}
+  try { localStorage.setItem('guac_last_res', '__fitwin'); } catch(e){}
+}
+window.addEventListener('resize', function(){
+  if (!_fitWin) return;
+  if (_fitWinTimer) clearTimeout(_fitWinTimer);
+  _fitWinTimer = setTimeout(_fitWinSend, 400);
+});
+async function resChange(v){
+  if (v === '__fitwin'){
+    _fitWin = true;
+    const wh = fitWinSize();
+    applyRes(wh[0] + 'x' + wh[1]);
+    showToast('自适应: 远端将跟随本窗口大小 (' + wh[0] + '×' + wh[1] + '), 窗口变化会自动同步');
+    return;
+  }
+  _fitWin = false;
+  if (v === '__custom'){
+    const cur = (client && client.getDisplay().getWidth()) ? client.getDisplay().getWidth() + 'x' + client.getDisplay().getHeight() : '1920x1080';
+    const v2 = await rpPrompt({ title:'自定义分辨率 (宽x高)', defaultName: cur });
+    if (!v2 || !/^\d{3,5}x\d{3,5}$/.test(v2.trim())) { document.getElementById('tbRes').value = ''; return; }
+    applyRes(v2.trim());
+    return;
+  }
+  if (!v || !client) return;
+  applyRes(v);
+}
+function applyRes(v){
+  const parts = String(v).split('x');
+  const w = parseInt(parts[0], 10), h = parseInt(parts[1], 10);
+  if (!w || !h) return;
+  try { client.sendSize(w, h); } catch(e){ showToast('分辨率下发失败: ' + e.message); return; }
+  showToast('已请求远端切换为 ' + w + '×' + h);
+  try { localStorage.setItem('guac_last_res', v); } catch(e){}
+  setTimeout(function(){ _fitRetry = 0; applyFit(); }, 500);
+}
+function roChange(v){ /* isRO() 在发送端判断 */ }
+
+/* ═══ v5.31.0 · 全屏 ═══ */
+function toggleFullscreen(){
+  document.body.classList.toggle('fs');
+  const on = document.body.classList.contains('fs');
+  const b = document.getElementById('fsBtn');
+  if (b) b.textContent = on ? '⛶ 退出全屏' : '⛶ 全屏';
+  try {
+    if (on && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function(){});
+    else if (!on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function(){});
+  } catch(e){}
+  setTimeout(applyFit, 250);
+}
+document.addEventListener('fullscreenchange', function(){
+  const on = !!document.fullscreenElement;
+  document.body.classList.toggle('fs', on);
+  const b = document.getElementById('fsBtn');
+  if (b) b.textContent = on ? '⛶ 退出全屏' : '⛶ 全屏';
+  setTimeout(applyFit, 250);
+});
+document.addEventListener('keydown', function(e){
+  if (e.key === 'F11'){ e.preventDefault(); toggleFullscreen(); }
+  else if (e.key === 'Escape' && document.body.classList.contains('fs') && !document.fullscreenElement){
+    document.body.classList.remove('fs');
+    const b = document.getElementById('fsBtn'); if (b) b.textContent = '⛶ 全屏';
+    setTimeout(applyFit, 200);
+  }
+});
+
+/* ═══ v5.31.0 · 高级连接参数 (画质/剪贴板/驱动/安全模式) ═══ */
+const ADV_KEY = 'guac_adv_prefs';
+function toggleAdv(){
+  const el = document.getElementById('adv');
+  if (!el) return;
+  const open = el.style.display === 'block';
+  el.style.display = open ? 'none' : 'block';
+  const b = document.getElementById('advBtn');
+  if (b) b.textContent = open ? '⚙ 高级' : '⚙ 高级 ▴';
+  if (!open) setTimeout(applyFit, 120);
+}
+function advLoad(){
+  let p = {};
+  try { p = JSON.parse(localStorage.getItem(ADV_KEY) || '{}'); } catch(e){}
+  const set = function(id, v){ const e = document.getElementById(id); if (e) { if (e.type === 'checkbox') e.checked = !!v; else e.value = (v == null ? '' : v); } };
+  set('pWallpaper', p.wallpaper);
+  set('pFontSmooth', p.font_smooth !== false);
+  set('pTheming', p.theming);
+  set('pLocalCursor', p.local_cursor !== false);
+  set('pDrive', p.drive);
+  set('pForceNew', p.force_new);
+  set('pMultiMon', p.multi_monitor);
+  set('pBitmapCache', p.bitmap_cache !== false);
+  set('pSwapRedBlue', p.swap_red_blue);
+  set('pColorDepth', p.color_depth || '24');
+  set('pSecurity', p.security || '');
+  set('pQuality', p.quality || 'best');
+  set('pDrivePath', p.drive_path || '');
+}
+function advGather(){
+  const g = function(id){ const e = document.getElementById(id); return e ? e.value : ''; };
+  const c = function(id){ const e = document.getElementById(id); return !!(e && e.checked); };
+  return { wallpaper: c('pWallpaper'), font_smooth: c('pFontSmooth'), theming: c('pTheming'),
+           local_cursor: c('pLocalCursor'), drive: c('pDrive'), force_new: c('pForceNew'),
+           bitmap_cache: c('pBitmapCache'), swap_red_blue: c('pSwapRedBlue'),
+           color_depth: g('pColorDepth'), security: g('pSecurity'),
+           quality: g('pQuality'), drive_path: g('pDrivePath'),
+           multi_monitor: c('pMultiMon') };
+}
+function advApply(){
+  const p = advGather();
+  try { localStorage.setItem(ADV_KEY, JSON.stringify(p)); } catch(e){}
+  const m = document.getElementById('advMsg');
+  if (m) m.textContent = '✓ 已保存, 正在重连…';
+  manual = true;
+  try { if (client) client.disconnect(); } catch(e){}
+  client = null;
+  setTimeout(function(){ manual = false; connect(); }, 260);
+}
+function advPreset(kind){
+  const set = function(id, v){ const e = document.getElementById(id); if (e) { if (e.type === 'checkbox') e.checked = !!v; else e.value = v; } };
+  if (kind === 'best'){
+    set('pWallpaper', true); set('pFontSmooth', true); set('pTheming', true);
+    set('pColorDepth', '24'); set('pBitmapCache', true); set('pQuality', 'best');
+  } else if (kind === 'fast'){
+    set('pWallpaper', false); set('pFontSmooth', false); set('pTheming', false);
+    set('pColorDepth', '16'); set('pBitmapCache', true); set('pQuality', 'fast');
+  } else {   // compat
+    set('pWallpaper', false); set('pFontSmooth', true); set('pTheming', false);
+    set('pColorDepth', '16'); set('pBitmapCache', true); set('pQuality', 'balanced');
+  }
+  const m = document.getElementById('advMsg');
+  if (m) m.textContent = '✓ 已套用预设 (点「应用并重连」生效)';
+}
+
+
+
+initToolbar();
+connect();
+
+/* ═══════════════════════════════════════════════════════════════
+   v5.38.0 · P1.1 文件传输 UI (guacd SFTP 通道)
+   能力: 浏览远端目录 / 下载文件 / 上传文件(选择+拖拽) / 新建目录
+   实现: guacamole-common-js 的 Object(文件系统) + 流 API
+   ═══════════════════════════════════════════════════════════════ */
+var _fs = null;            // 远端文件系统对象 (client.onfilesystem 注入)
+var _fsPath = '/';         // 当前目录
+var _fsEntries = [];       // 当前目录条目
+var _fsPanel = null;       // 面板 DOM
+
+function fsReady(){ return !!_fs; }
+
+function fsToggle(){
+  if (!client || client.getState() !== 3){ setMsg('请先连接成功后再使用文件传输', true); return; }
+  if (!_fs){ setMsg('该目标未提供文件系统 (Windows 无 SSH / 未启用 SFTP) — 可尝试用「高级」里的驱动器映射', true); return; }
+  if (_fsPanel && _fsPanel.style.display !== 'none'){ _fsPanel.style.display = 'none'; return; }
+  fsShow();
+}
+
+function fsShow(){
+  if (!_fsPanel){
+    _fsPanel = document.createElement('div');
+    _fsPanel.id = 'fsPanel';
+    _fsPanel.style.cssText = 'position:fixed;right:14px;top:64px;width:520px;max-height:70vh;z-index:9999;'
+      + 'background:#131a26;color:#c8d2e0;border:1px solid #2b3546;border-radius:10px;'
+      + 'display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.5);font-size:12.5px';
+    _fsPanel.innerHTML =
+      '<div style="padding:8px 12px;border-bottom:1px solid #2b3546;display:flex;align-items:center;gap:8px">'
+      + '<b>📁 文件传输</b><span id="fsStat" style="color:#7c8ba1;font-size:11px;flex:1"></span>'
+      + '<button class="fs-btn" onclick="fsMkdir()" title="在当前目录新建文件夹">＋目录</button>'
+      + '<button class="fs-btn" onclick="fsPickUpload()" title="上传文件到当前目录">⬆ 上传</button>'
+      + '<button class="fs-btn" onclick="fsClose()">✕</button></div>'
+      + '<div style="padding:6px 12px;display:flex;gap:6px;align-items:center;border-bottom:1px solid #2b3546">'
+      + '<button class="fs-btn" onclick="fsUp()" title="上级目录">⬆ 上级</button>'
+      + '<button class="fs-btn" onclick="fsGo(\'/\')" title="根目录">🏠</button>'
+      + '<input id="fsPathInput" style="flex:1;background:#0d131c;color:#c8d2e0;border:1px solid #2b3546;border-radius:5px;padding:3px 8px;font-family:monospace" '
+      + 'onkeydown="if(event.key===\'Enter\')fsGo(this.value)"></div>'
+      + '<div id="fsList" style="flex:1;overflow-y:auto;padding:4px 6px;min-height:120px"></div>'
+      + '<div style="padding:6px 12px;border-top:1px solid #2b3546;color:#7c8ba1;font-size:11px" id="fsHint">'
+      + '双击目录进入 · 点文件下载 · 拖拽文件到画面任意处上传</div>';
+    document.body.appendChild(_fsPanel);
+    var st = document.createElement('style');
+    st.textContent = '#fsPanel .fs-btn{background:#1d2534;color:#c8d2e0;border:1px solid #2b3546;border-radius:5px;padding:2px 9px;cursor:pointer;font-size:11.5px}'
+      + '#fsPanel .fs-btn:hover{background:#263041}'
+      + '#fsPanel .fs-row{display:flex;align-items:center;gap:8px;padding:3px 8px;border-radius:5px;cursor:pointer}'
+      + '#fsPanel .fs-row:hover{background:#1d2534}';
+    document.head.appendChild(st);
+  }
+  _fsPanel.style.display = 'flex';
+  fsList(_fsPath);
+}
+function fsClose(){ if (_fsPanel) _fsPanel.style.display = 'none'; }
+
+function fsStat(msg){ var el = document.getElementById('fsStat'); if (el) el.textContent = msg || ''; }
+
+function fsJoin(p, name){
+  if (!p || p === '/') return '/' + name;
+  return p.replace(/\/+$/, '') + '/' + name;
+}
+function fsParent(p){
+  if (!p || p === '/') return '/';
+  var parts = p.replace(/\/+$/, '').split('/');
+  parts.pop();
+  return parts.join('/') || '/';
+}
+function fmtSize(n){
+  n = Number(n) || 0;
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n/1024).toFixed(1) + ' KB';
+  if (n < 1073741824) return (n/1048576).toFixed(1) + ' MB';
+  return (n/1073741824).toFixed(2) + ' GB';
+}
+
+/* v5.38.0 · guacd 要求路径按段传递 (段内不能含 '/'); 根目录 = 空段数组 */
+function fsSegs(p){
+  return String(p || '').split('/').filter(function(x){ return x && x !== '.'; });
+}
+function fsList(path){
+  if (!_fs) return;
+  _fsPath = path || '/';
+  fsStat('⏳ 读取 ' + _fsPath + ' …');
+  try {
+    // v5.38.0 · lib 1.5.5 API: requestInputStream(name:string, bodyCallback)
+    //   回调 (inputStream, mimetype) — 目录列表 JSON 由 lib 自动从 body/blob 流拼装
+    _fs.requestInputStream(_fsPath, function(stream, mimetype){
+      var reader = new Guacamole.JSONReader(stream);
+      reader.onend = function(){
+        var idx = null;
+        try { idx = reader.getJSON(); } catch(e){}
+        var list = (idx && idx.type === 'directory') ? (idx.contents || []) : [];
+        _fsEntries = list;
+        fsRender();
+        fsStat(_fsPath + ' · ' + list.length + ' 项');
+      };
+    });
+  } catch(e){ fsStat('✗ 无法打开目录: ' + e); }
+}
+
+function fsRender(){
+  var box = document.getElementById('fsList');
+  if (!box) return;
+  var pi = document.getElementById('fsPathInput');
+  if (pi) pi.value = _fsPath;
+  if (!_fsEntries.length){ box.innerHTML = '<div style="color:#7c8ba1;padding:10px">(空目录)</div>'; return; }
+  var dirs = _fsEntries.filter(function(e){ return e.type === 'directory'; });
+  var files = _fsEntries.filter(function(e){ return e.type !== 'directory'; });
+  var esc = function(s){ return String(s == null ? '' : s).split('<').join('&lt;'); };
+  var h = '';
+  dirs.forEach(function(e){
+    h += '<div class="fs-row" ondblclick="fsGo(\'' + fsJoin(_fsPath, e.name).split("'").join("\\'") + '\')" '
+       + 'onclick="fsSel(this)" title="双击进入">📁 ' + esc(e.name) + '</div>';
+  });
+  files.forEach(function(e){
+    var full = fsJoin(_fsPath, e.name);
+    h += '<div class="fs-row" onclick="fsSel(this)">📄 <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(e.name) + '</span>'
+       + '<span style="color:#7c8ba1;font-size:11px">' + fmtSize(e.size) + '</span>'
+       + '<button class="fs-btn" onclick="event.stopPropagation();fsDownload(\'' + full.split("'").join("\\'") + '\',\'' + esc(e.name).split("'").join("\\'") + '\')">⬇ 下载</button></div>';
+  });
+  box.innerHTML = h || '<div style="color:#7c8ba1;padding:10px">(无条目)</div>';
+}
+function fsSel(el){
+  var box = document.getElementById('fsList');
+  if (box) box.querySelectorAll('.fs-row').forEach(function(x){ x.style.background = ''; });
+  el.style.background = '#263041';
+}
+function fsUp(){ fsList(fsParent(_fsPath)); }
+function fsGo(p){ if (p) fsList(p); }
+
+function fsDownload(full, name){
+  fsStat('⏳ 下载 ' + name + ' …');
+  try {
+    _fs.requestInputStream(full, function(stream, mimetype){
+      var reader = new Guacamole.BlobReader(stream, mimetype || 'application/octet-stream');
+      reader.onend = function(){
+        var blob = reader.getBlob();
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name || 'download.bin';
+        a.click();
+        setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+        fsStat('✓ 已下载 ' + name + ' (' + fmtSize(blob.size) + ')');
+      };
+    });
+  } catch(e){ fsStat('✗ 下载失败: ' + e); }
+}
+
+function fsPickUpload(){
+  var inp = document.createElement('input');
+  inp.type = 'file';
+  inp.multiple = true;
+  inp.onchange = function(){
+    for (var i = 0; i < inp.files.length; i++) fsUpload(inp.files[i]);
+  };
+  inp.click();
+}
+
+function fsUpload(file, dirOverride){
+  if (!_fs || !file) return;
+  var dir = dirOverride || _fsPath;
+  var target = fsJoin(dir, file.name);
+  fsStat('⬆ 上传 ' + file.name + ' (' + fmtSize(file.size) + ') …');
+  var out;
+  try {
+    out = _fs.createOutputStream('application/octet-stream', target);
+  } catch(e){ fsStat('✗ 上传失败: ' + e); return; }
+  var done = false;
+  out.onack = function(status){
+    if (status && status.isError && status.isError()){ fsStat('✗ 上传失败: ' + (status.message || '')); return; }
+    if (!done){ done = true; fsStat('✓ 已上传 ' + file.name + ' → ' + dir); if (_fsPanel.style.display !== 'none') fsList(_fsPath); }
+  };
+  out.sendBlob(file);
+  setTimeout(function(){ try { out.sendEnd(); } catch(e){} }, 100);
+}
+
+async function fsMkdir(){
+  var name = await rpPrompt({ title:'新建文件夹名称', defaultName:'新建文件夹' });
+  if (!name) return;
+  var target = fsJoin(_fsPath, name);
+  try {
+    var out = _fs.createOutputStream('application/vnd.glyptodon.guacamole.stream-index+json', target);
+    out.sendEnd();
+    setTimeout(function(){ fsStat('✓ 已创建 ' + target); fsList(_fsPath); }, 600);
+  } catch(e){ fsStat('✗ 创建失败: ' + e); }
+}
+
+/* ── 拖拽上传: 拖文件到画面任意处 ── */
+(function(){
+  var dz = null;
+  function ensureOverlay(){
+    if (dz) return dz;
+    dz = document.createElement('div');
+    dz.style.cssText = 'position:fixed;inset:0;z-index:10001;display:none;align-items:center;justify-content:center;'
+      + 'background:rgba(20,40,70,.55);color:#dbe6f3;font-size:18px;border:3px dashed #54d18c;pointer-events:none';
+    dz.textContent = '⬆ 松开上传到 ' + '远端当前目录';
+    document.body.appendChild(dz);
+    return dz;
+  }
+  ['dragenter','dragover'].forEach(function(ev){
+    document.addEventListener(ev, function(e){
+      if (!fsReady()) return;
+      e.preventDefault();
+      var o = ensureOverlay();
+      o.querySelector && (o.childNodes[0].nodeValue = '⬆ 松开上传到 ' + _fsPath);
+      o.style.display = 'flex';
+    });
+  });
+  document.addEventListener('dragleave', function(e){
+    if (e.relatedTarget === null && dz) dz.style.display = 'none';
+  });
+  document.addEventListener('drop', function(e){
+    if (!fsReady()) return;
+    e.preventDefault();
+    if (dz) dz.style.display = 'none';
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    for (var i = 0; i < files.length; i++) fsUpload(files[i]);
+  });
+})();
+
+</script>
+</body>
+</html>

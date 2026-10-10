@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<!--
+  Fonriv · VM/主机 控制台 (v5.20.0)
+
+  与 terminal.html 同模式: 独立窗口页, 参数走 query string。
+  画面由 noVNC 渲染, 数据面走 /ws/vnc (服务端字节桥 → PVE vncwebsocket)。
+
+  为什么走自建桥而不是直连 PVE:
+    · PVE 凭据(用户名/密码或 API Token)必须留在服务端, 不能下发给浏览器;
+    · PVE 证书通常是自签的, 浏览器直连会被拦; 服务端内固定不校验即可;
+    · 以后接通用 RDP/VNC (guacd) 时, 前端无需改动 —— 换后端实现即可。
+
+  参数: node, vmid, kind(qemu|lxc), auth_token
+-->
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Fonriv · 控制台</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#0b0e14; overflow:hidden;
+               font-family: system-ui, -apple-system, "Noto Sans CJK SC", sans-serif; }
+  #bar { height:36px; display:flex; align-items:center; gap:10px; padding:0 12px;
+         background:#121722; color:#c8d2e0; font-size:12.5px; border-bottom:1px solid #232b3a; }
+  #bar .title { font-weight:600; color:#7fd1ff; }
+  #bar .spacer { flex:1 }
+  #bar button { background:#1d2534; color:#c8d2e0; border:1px solid #2b3546;
+                border-radius:5px; padding:4px 10px; font-size:12px; cursor:pointer }
+  #bar button:hover { background:#263041 }
+  #dot { width:8px; height:8px; border-radius:50%; background:#666 }
+  #screen { position:absolute; top:36px; left:0; right:0; bottom:0; }
+  #msg { position:absolute; inset:36px 0 0 0; display:flex; align-items:center;
+         justify-content:center; color:#9fb0c8; font-size:13.5px; text-align:center;
+         padding:24px; line-height:1.9; white-space:pre-wrap }
+  #msg.err { color:#ff8f8f }
+  #msg a { color:#7fd1ff }
+</style>
+<script>
+/* v6.0.0 · 读取主界面主题偏好(rp_theme)同步到本页 */
+try{
+  var _t = localStorage.getItem('rp_theme') || 'dark';
+  if (_t === 'auto'){ _t = (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark'; }
+  document.documentElement.setAttribute('data-theme', _t);
+}catch(_){}
+</script>
+<!-- v6.3.28 · 与主界面共用的主题化模态基建(独立页, 无 {{APP_VERSION}} 模板;
+     /static/* 由服务端按 no-cache, must-revalidate 下发, 故无需版本串防缓存) -->
+<script src="/static/rp_dialogs.js"></script>
+</head>
+<body>
+<div id="bar">
+  <span id="dot"></span>
+  <span class="title" id="ttl">控制台</span>
+  <span class="spacer"></span>
+  <button onclick="sendCtrlAltDel()" title="发送 Ctrl+Alt+Del 到远端">Ctrl+Alt+Del</button>
+  <button onclick="toggleScale()" title="缩放模式">居中/拉伸</button>
+  <button onclick="reconnect()">重连</button>
+  <button id="recBtn" style="display:none;color:#ff6b6b" onclick="toggleRec()">⏺ 录制</button>
+  <span id="recTime" style="display:none;font-size:11px;color:#ff6b6b;font-family:monospace"></span>
+</div>
+<div id="screen"></div>
+<div id="msg">正在连接控制台…</div>
+
+<script type="module">
+import RFB from '/static/vendor/novnc/core/rfb.js';
+
+const qs  = new URLSearchParams(location.search);
+const NODE = qs.get('node') || '';
+const VMID = qs.get('vmid') || '';
+const KIND = (qs.get('kind') || 'qemu').toLowerCase();
+const TOKEN = qs.get('auth_token') || '';
+// v5.20.2 · raw 模式: 直连任意标准 VNC 服务器 (Linux x11vnc/tigervnc · macOS 屏幕共享 · Windows VNC)
+const MODE = (qs.get('mode') || 'pve').toLowerCase();
+const VHOST = qs.get('vhost') || '';
+const VPORT = qs.get('vport') || '5900';
+const VPASS = qs.get('vpassword') || '';
+
+const msgEl = document.getElementById('msg');
+const dot   = document.getElementById('dot');
+let rfb = null;
+let RECONN = 0;
+
+function setMsg(t, isErr){
+  if (!t){ msgEl.style.display = 'none'; return; }
+  msgEl.style.display = 'flex';
+  msgEl.className = isErr ? 'err' : '';
+  msgEl.innerHTML = t;
+}
+function setDot(c){ dot.style.background = c; }
+
+document.getElementById('ttl').textContent =
+  `控制台 · ${KIND === 'lxc' ? '容器' : 'VM'} ${VMID}` + (NODE ? ` @ ${NODE}` : '');
+
+function wsUrl(){
+  // v5.20.2 · 主 /ws 通道 (vnc=1 触发桥模式) — 独立 /ws/vnc 不可用已弃用
+  const p = new URLSearchParams({ vnc: '1', mode: MODE });
+  if (MODE === 'raw') { p.set('vhost', VHOST); p.set('vport', VPORT); }
+  else {
+    p.set('node', NODE); p.set('vmid', VMID); p.set('kind', KIND);
+    // v5.31.5 · 桥用同一 ticket 连 vncwebsocket (pve_console 下发的一次性 ticket)
+    var vt = qs.get('vncticket'), vp = qs.get('vncport');
+    if (vt) { p.set('vncticket', vt); p.set('vncport', vp || '5900'); }
+  }
+  if (TOKEN) p.set('auth_token', TOKEN);
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${proto}://${location.host}/ws?${p.toString()}`;
+}
+
+function connect(){
+  setDot('#e8b44a');
+  setMsg('正在连接控制台…');
+  try {
+    rfb = new RFB(document.getElementById('screen'), wsUrl(), {
+      credentials: { password: VPASS },
+    });
+  } catch (e) {
+    setDot('#ff5f5f');
+    setMsg('初始化失败: ' + e.message, true);
+    return;
+  }
+
+  rfb.addEventListener('connect', () => {
+    setDot('#54d18c'); setMsg('');
+    try { rfb.scaleViewport = true; rfb.resizeSession = false; } catch(e){}
+  });
+
+  rfb.addEventListener('disconnect', (e) => {
+    setDot('#ff5f5f');
+    const d = e && e.detail || {};
+    let why = d.reason || '连接已断开';
+    // v5.23.0 · 自适应: 非主动关闭 → 自动重连 (3s 间隔, 最多 5 次)
+    if (!d.clean && !window.__manualClose && RECONN < 5 && qs.get('noreconn') !== '1'){
+      RECONN++;
+      setDot('#e8b44a');
+      setMsg('连接断开 — 3 秒后自动重连 (第 ' + RECONN + '/5 次)…', true);
+      setTimeout(function(){ if (!window.__manualClose) reconnect(); }, 3000);
+      return;
+    }
+    // 服务端在拿不到 PVE ticket 时会先发一条 {"rp_error": "..."} 文本帧,
+    // noVNC 会把它当作协议错误并断开 —— 这里把它翻译成人话。
+    if (d.clean === false) why += '（可能被远端关闭）';
+    setMsg(hintOf(why), true);
+  });
+
+  rfb.addEventListener('credentialsrequired', async () => {
+    // 服务端要求 VNC 密码但 URL 未带 — 内联询问后重连
+    /* v6.3.28 · 原为原生 prompt → 与主界面共用的主题化模态 */
+    const pw = await rpPrompt({ title:'该 VNC 服务需要密码, 请输入' });
+    if (pw != null) {
+      const u = new URL(location.href);
+      u.searchParams.set('vpassword', pw);
+      location.replace(u.toString());
+    } else {
+      setDot('#ff5f5f');
+      setMsg('未提供密码, 无法完成 VNC 认证。可在「远程桌面」的连接卡片里保存密码后重试。', true);
+    }
+  });
+
+  rfb.addEventListener('securityfailure', (e) => {
+    setDot('#ff5f5f');
+    setMsg('安全握手失败: ' + ((e.detail && e.detail.reason) || '未知'), true);
+  });
+
+  rfb.addEventListener('credentialsrequired', async () => {
+    /* v6.3.28 · 原为原生 prompt → 与主界面共用的主题化模态 */
+    const pw = (await rpPrompt({ title:'该控制台需要密码' })) || '';
+    try { rfb.sendCredentials({ password: pw }); } catch(e){}
+  });
+}
+
+function hintOf(why){
+  const w = String(why);
+  if (w.indexOf('rp_error') >= 0){
+    try {
+      const j = JSON.parse(w.substring(w.indexOf('{')));
+      if (j.rp_error) return '服务端拒绝: ' + j.rp_error +
+        '\n\n请检查: 设置页 → PVE 连接 (主机/凭据) 是否配置正确。';
+    } catch(e){}
+  }
+  if (/not.*found|Missing|not configured|未配置/i.test(w)){
+    return '控制台不可用: ' + w +
+      '\n\n请确认 PVE 连接已配置, 且该 VM/CT 处于运行状态。';
+  }
+  return w + '\n\n可点右上「重连」再试; 若持续失败请查看服务端日志。';
+}
+
+function sendCtrlAltDel(){
+  if (rfb) { try { rfb.sendCtrlAltDel(); } catch(e){} }
+}
+function toggleScale(){
+  if (!rfb) return;
+  try { rfb.scaleViewport = !rfb.scaleViewport; } catch(e){}
+}
+function reconnect(){
+  if (rfb) { try { rfb.disconnect(); } catch(e){} rfb = null; }
+  window.__manualClose = true;   // 手动重连不触发自动重连计数
+  document.getElementById('screen').innerHTML = '';
+  setTimeout(function(){ window.__manualClose = false; connect(); }, 50);
+}
+function fit(){
+  const el = document.getElementById('screen');
+  const w = el.clientWidth, h = el.clientHeight;
+  if (rfb && rfb._screen && rfb._screen.width){
+    try { rfb.scaleViewport = true; } catch(e){}
+  }
+  return { w, h };
+}
+
+if (MODE === 'raw'){
+  document.getElementById('ttl').textContent = `控制台 · VNC ${VHOST}:${VPORT}`;
+  if (!VHOST){
+    setMsg('缺少参数: vhost', true); setDot('#ff5f5f');
+  } else {
+    connect();
+  }
+} else if (!NODE || !VMID){
+  setMsg('缺少参数: node / vmid\n\n请从 PVE 面板的「🖥 控制台」按钮打开本页面。', true);
+  setDot('#ff5f5f');
+} else {
+  connect();
+}
+window.addEventListener('resize', () => { fit(); });
+
+// ═══ v5.23.0 · 会话录制 (vnc_record, 专业档能力): MediaRecorder 录 noVNC 画布 → webm 上传 ═══
+let mediaRec = null, recChunks = [], recTimer = null, recStart = 0;
+
+function recSupported(){ return 'MediaRecorder' in window && HTMLCanvasElement.prototype.captureStream; }
+
+function recShowBtn(){
+  const btn = document.getElementById('recBtn');
+  if (!btn) return;
+  if (qs.get('rec') === '1' && recSupported()){ btn.style.display = ''; }
+}
+
+function toggleRec(){
+  const btn = document.getElementById('recBtn');
+  const cv = document.querySelector('#screen canvas');
+  if (!cv){ alert('画面尚未连接'); return; }
+  if (mediaRec && mediaRec.state === 'recording'){
+    mediaRec.stop();   // onstop 里完成上传
+    return;
+  }
+  try {
+    const stream = cv.captureStream(15);
+    const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+      .find(m => MediaRecorder.isTypeSupported(m)) || '';
+    mediaRec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  } catch(e){ alert('录制初始化失败: ' + e.message); return; }
+  recChunks = [];
+  mediaRec.ondataavailable = ev => { if (ev.data && ev.data.size) recChunks.push(ev.data); };
+  mediaRec.onstop = recFinish;
+  mediaRec.start(1000);
+  recStart = Date.now();
+  btn.textContent = '⏹ 停止并保存';
+  const t = document.getElementById('recTime'); t.style.display = '';
+  recTimer = setInterval(() => {
+    const sec = Math.floor((Date.now() - recStart) / 1000);
+    t.textContent = String(Math.floor(sec/60)).padStart(2,'0') + ':' + String(sec%60).padStart(2,'0');
+  }, 1000);
+}
+
+async function recFinish(){
+  clearInterval(recTimer);
+  const btn = document.getElementById('recBtn');
+  btn.textContent = '⏺ 录制';
+  document.getElementById('recTime').style.display = 'none';
+  const blob = new Blob(recChunks, { type: 'video/webm' });
+  recChunks = [];
+  if (blob.size < 1024){ setMsg('录制内容为空', true); return; }
+  // ① 本地下载副本 (始终给操作者留一份)
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'rec_' + VHOST + '_' + new Date().toISOString().replace(/[:T]/g,'-').slice(0,19) + '.webm';
+  a.click();
+  // ② 上传服务端归档 (能力闸在服务端)
+  try {
+    const fd = new FormData();
+    fd.append('file', blob, a.download);
+    const r = await fetch('/api/vnc_rec?host=' + encodeURIComponent(VHOST || 'vnc') + '&token=' + encodeURIComponent(TOKEN || qs.get('auth_token') || ''), {
+      method: 'POST', body: fd
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.status === 'ok'){
+      alert('✓ 录制已保存到服务端: ' + (d.file || '') + ' (' + Math.round(blob.size/1024) + ' KB) — 可在「远程桌面 → 会话录制」回放');
+    } else {
+      alert('本地已下载副本; 服务端保存失败: ' + (d.msg || ('HTTP ' + r.status)));
+    }
+  } catch(e){
+    alert('本地已下载副本; 服务端不可达: ' + e.message);
+  }
+}
+recShowBtn();
+
+</script>
+</body>
+</html>

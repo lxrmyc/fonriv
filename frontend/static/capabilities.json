@@ -1,0 +1,514 @@
+{
+  "features": {
+    "ai": {
+      "edition": "pro",
+      "group": "🔁 跨模块",
+      "label": "AI 运维助手 (自然语言生成计划)"
+    },
+    "airgap": {
+      "edition": "enterprise",
+      "group": "🔒 安全",
+      "label": "Air-Gap 摆渡 (物理隔离数据摆渡)"
+    },
+    "audit": {
+      "edition": "community",
+      "group": "📊 总览 / 审计",
+      "label": "审计"
+    },
+    "cloud": {
+      "edition": "enterprise",
+      "group": "🌐 共享 / 远端存储",
+      "label": "远端存储 (S3/OSS/COS/Seafile/123盘/本地/rclone)"
+    },
+    "cloudpool": {
+      "edition": "enterprise",
+      "group": "💽 存储卷",
+      "label": "智能存储池 CloudPool (异构联邦·统一命名空间·成员纳管与对账·容量健康与扩容编排)"
+    },
+    "connhub": {
+      "edition": "community",
+      "group": "🔌 连接中心",
+      "label": "连接中心 (服务器档案/会话复用/凭据保险库/分组)"
+    },
+    "core": {
+      "edition": null,
+      "group": "📁 基础 / 传输",
+      "label": "核心 (登录/浏览/基础传输)"
+    },
+    "dashboard": {
+      "edition": "community",
+      "group": "📊 总览 / 审计",
+      "label": "数据总览"
+    },
+    "dbbackup": {
+      "edition": "pro",
+      "group": "📊 总览 / 审计",
+      "label": "数据库热备份 (MySQL/PG 不停机)"
+    },
+    "disk": {
+      "edition": "enterprise",
+      "group": "🌐 共享 / 远端存储",
+      "label": "远端磁盘管理"
+    },
+    "docker": {
+      "edition": "community",
+      "group": "📦 容器",
+      "label": "Docker 容器管理 (SSH 远端)"
+    },
+    "flow": {
+      "edition": "enterprise",
+      "group": "🔁 跨模块",
+      "label": "跨模块传输 (自动备份 flow)"
+    },
+    "fonrvfs": {
+      "edition": "pro",
+      "group": "🌐 共享 / 远端存储",
+      "label": "多云文件管理 + 多云虚拟存储池 (统一工作区/跨存储浏览/传输任务管理)"
+    },
+    "k8s_backup": {
+      "edition": "pro",
+      "group": "🖥 Proxmox 备份",
+      "label": "K8s/容器备份 (etcd/PV/docker)"
+    },
+    "lvm": {
+      "edition": "enterprise",
+      "group": "💽 存储卷",
+      "label": "LVM 管理"
+    },
+    "pbs": {
+      "edition": "enterprise",
+      "group": "🖥 Proxmox 备份",
+      "label": "PBS 备份"
+    },
+    "pve": {
+      "edition": "community",
+      "group": "🖥 Proxmox 备份",
+      "label": "PVE 节点连接 + 一键备份 (pro)"
+    },
+    "pve_console": {
+      "edition": "pro",
+      "group": "🖥 远程运维",
+      "label": "PVE 虚拟控制台 (noVNC)"
+    },
+    "rbd": {
+      "edition": "enterprise",
+      "group": "💽 存储卷",
+      "label": "RBD 管理"
+    },
+    "rdp": {
+      "edition": "community",
+      "group": "🖥 远程桌面",
+      "label": "RDP 远程桌面 (guacd 网关)"
+    },
+    "restic": {
+      "edition": "pro",
+      "group": "💽 存储卷",
+      "label": "restic 去重加密备份"
+    },
+    "rsync": {
+      "edition": "community",
+      "group": "📁 基础 / 传输",
+      "label": "文件传输 (rsync/上传下载)"
+    },
+    "schedule": {
+      "edition": "community",
+      "group": "📁 基础 / 传输",
+      "label": "定时调度"
+    },
+    "share": {
+      "edition": "community",
+      "group": "🌐 共享 / 远端存储",
+      "label": "网络共享 (SMB/NFS 挂载)"
+    },
+    "share_mgmt": {
+      "edition": "pro",
+      "group": "🌐 共享 / 远端存储",
+      "label": "分享管理 (局域网分享/HTTP 链接/SMB 账号与权限/服务管理)"
+    },
+    "terminal": {
+      "edition": "community",
+      "group": "🖥 终端",
+      "label": "终端 (SSH)"
+    },
+    "vnc_record": {
+      "edition": "enterprise",
+      "group": "🖥 远程桌面",
+      "label": "远程桌面会话录制"
+    },
+    "vzdump": {
+      "edition": "community",
+      "group": "🖥 Proxmox 备份",
+      "label": "vzdump 打包"
+    },
+    "wanlink": {
+      "edition": "enterprise",
+      "group": "🌐 共享 / 远端存储",
+      "label": "跨网段节点直连 (双方均无公网入口时的协商直连)"
+    },
+    "watch": {
+      "edition": "pro",
+      "group": "📁 基础 / 传输",
+      "label": "实时同步守护 (inotify)"
+    },
+    "zfs": {
+      "edition": "enterprise",
+      "group": "💽 存储卷",
+      "label": "ZFS 管理"
+    }
+  },
+  "generated_at": "2026-10-12 09:12:52",
+  "generated_by": "scripts/gen_capabilities.py",
+  "protocols": {
+    "cloudpool": {
+      "caps": {
+        "checksum_etag": false,
+        "chmod": false,
+        "delete": false,
+        "keep_versions_on_restore": true,
+        "list": true,
+        "max_upload_size": -1,
+        "mkdir": true,
+        "mkfile": true,
+        "multipart": false,
+        "notes": "存储池: 浏览+读取; 池根可新建目录/文本文件(落在网关目录, 整池共享可见); 成员内写入请在「存储池」页按策略写入(§19 Managed / §29 目录策略)",
+        "object_lock": false,
+        "presign": false,
+        "protocol": "cloudpool",
+        "quota": true,
+        "range_read": true,
+        "read": true,
+        "rename": false,
+        "search_server": false,
+        "server_side_copy": false,
+        "server_side_move": false,
+        "stat": true,
+        "versions": false,
+        "watch": false,
+        "write": false
+      },
+      "ui": {
+        "pathstyle": false,
+        "ps": false,
+        "region": false,
+        "repo_id": false,
+        "s3like": false
+      }
+    },
+    "cos": {
+      "caps": {
+        "checksum_etag": true,
+        "chmod": false,
+        "delete": true,
+        "keep_versions_on_restore": true,
+        "list": true,
+        "max_upload_size": -1,
+        "mkdir": true,
+        "mkfile": false,
+        "multipart": true,
+        "notes": "腾讯云 COS: 分片/Range 走 S3 兼容端点; 服务端复制走 x-cos-copy-source 原生签名(已实现); 版本历史为原生 API, 当前未实现",
+        "object_lock": false,
+        "presign": false,
+        "protocol": "cos",
+        "quota": false,
+        "range_read": true,
+        "read": true,
+        "rename": true,
+        "search_server": false,
+        "server_side_copy": true,
+        "server_side_move": false,
+        "stat": true,
+        "versions": false,
+        "watch": false,
+        "write": true
+      },
+      "ui": {
+        "pathstyle": false,
+        "ps": false,
+        "region": true,
+        "repo_id": false,
+        "s3like": true
+      }
+    },
+    "local": {
+      "caps": {
+        "checksum_etag": false,
+        "chmod": true,
+        "delete": true,
+        "keep_versions_on_restore": true,
+        "list": true,
+        "max_upload_size": -1,
+        "mkdir": true,
+        "mkfile": true,
+        "multipart": false,
+        "notes": "本机文件系统: 全部基础操作 + 服务端复制(cp -a)",
+        "object_lock": false,
+        "presign": false,
+        "protocol": "local",
+        "quota": true,
+        "range_read": true,
+        "read": true,
+        "rename": true,
+        "search_server": false,
+        "server_side_copy": true,
+        "server_side_move": true,
+        "stat": true,
+        "versions": false,
+        "watch": false,
+        "write": true
+      },
+      "ui": {
+        "pathstyle": false,
+        "ps": false,
+        "region": false,
+        "repo_id": false,
+        "s3like": false
+      }
+    },
+    "oss": {
+      "caps": {
+        "checksum_etag": true,
+        "chmod": false,
+        "delete": true,
+        "keep_versions_on_restore": true,
+        "list": true,
+        "max_upload_size": -1,
+        "mkdir": true,
+        "mkfile": false,
+        "multipart": true,
+        "notes": "阿里云 OSS: 分片/Range 走 S3 兼容端点; 服务端复制走 x-oss-copy-source 原生签名(已实现); 版本历史为原生 API, 当前未实现",
+        "object_lock": false,
+        "presign": false,
+        "protocol": "oss",
+        "quota": false,
+        "range_read": true,
+        "read": true,
+        "rename": true,
+        "search_server": false,
+        "server_side_copy": true,
+        "server_side_move": false,
+        "stat": true,
+        "versions": false,
+        "watch": false,
+        "write": true
+      },
+      "ui": {
+        "pathstyle": false,
+        "ps": true,
+        "region": false,
+        "repo_id": false,
+        "s3like": true
+      }
+    },
+    "pan123": {
+      "caps": {
+        "checksum_etag": false,
+        "chmod": false,
+        "delete": true,
+        "keep_versions_on_restore": true,
+        "list": true,
+        "max_upload_size": -1,
+        "mkdir": true,
+        "mkfile": false,
+        "multipart": false,
+        "notes": "123 云盘: 部分能力",
+        "object_lock": false,
+        "presign": false,
+        "protocol": "pan123",
+        "quota": false,
+        "range_read": true,
+        "read": true,
+        "rename": true,
+        "search_server": false,
+        "server_side_copy": false,
+        "server_side_move": false,
+        "stat": true,
+        "versions": false,
+        "watch": false,
+        "write": true
+      },
+      "ui": {
+        "pathstyle": false,
+        "ps": false,
+        "region": false,
+        "repo_id": false,
+        "s3like": false
+      }
+    },
+    "rclone": {
+      "caps": {
+        "checksum_etag": false,
+        "chmod": false,
+        "delete": true,
+        "keep_versions_on_restore": true,
+        "list": true,
+        "max_upload_size": -1,
+        "mkdir": true,
+        "mkfile": false,
+        "multipart": true,
+        "notes": "rclone: 47 种后端; 服务端复制视后端而定",
+        "object_lock": false,
+        "presign": false,
+        "protocol": "rclone",
+        "quota": false,
+        "range_read": true,
+        "read": true,
+        "rename": true,
+        "search_server": false,
+        "server_side_copy": true,
+        "server_side_move": false,
+        "stat": true,
+        "versions": false,
+        "watch": false,
+        "write": true
+      },
+      "ui": {
+        "pathstyle": false,
+        "ps": false,
+        "region": false,
+        "repo_id": false,
+        "s3like": false
+      }
+    },
+    "s3": {
+      "caps": {
+        "checksum_etag": true,
+        "chmod": false,
+        "delete": true,
+        "keep_versions_on_restore": true,
+        "list": true,
+        "max_upload_size": -1,
+        "mkdir": true,
+        "mkfile": false,
+        "multipart": true,
+        "notes": "S3 兼容 (AWS/MinIO/B2): 分片上传 + Range 读 + CopyObject 服务端复制; ETag(multipart) 非整文件 MD5",
+        "object_lock": true,
+        "presign": true,
+        "protocol": "s3",
+        "quota": false,
+        "range_read": true,
+        "read": true,
+        "rename": true,
+        "search_server": false,
+        "server_side_copy": true,
+        "server_side_move": false,
+        "stat": true,
+        "versions": true,
+        "watch": false,
+        "write": true
+      },
+      "ui": {
+        "pathstyle": true,
+        "ps": true,
+        "region": true,
+        "repo_id": false,
+        "s3like": true
+      }
+    },
+    "seafile": {
+      "caps": {
+        "checksum_etag": false,
+        "chmod": false,
+        "delete": true,
+        "keep_versions_on_restore": true,
+        "list": true,
+        "max_upload_size": -1,
+        "mkdir": true,
+        "mkfile": false,
+        "multipart": false,
+        "notes": "Seafile: 服务端复制/移动走 Web API operation=copy|move (已真机验证); 无对象版本控制 (覆盖留存由回收站承担)",
+        "object_lock": false,
+        "presign": false,
+        "protocol": "seafile",
+        "quota": false,
+        "range_read": true,
+        "read": true,
+        "rename": true,
+        "search_server": false,
+        "server_side_copy": true,
+        "server_side_move": true,
+        "stat": true,
+        "versions": false,
+        "watch": false,
+        "write": true
+      },
+      "ui": {
+        "pathstyle": false,
+        "ps": false,
+        "region": false,
+        "repo_id": true,
+        "s3like": false
+      }
+    },
+    "ssh": {
+      "caps": {
+        "checksum_etag": false,
+        "chmod": true,
+        "delete": true,
+        "keep_versions_on_restore": true,
+        "list": true,
+        "max_upload_size": -1,
+        "mkdir": true,
+        "mkfile": true,
+        "multipart": false,
+        "notes": "SSH/SFTP: 命令式实现; 大文件走 rsync/scp 通道",
+        "object_lock": false,
+        "presign": false,
+        "protocol": "ssh",
+        "quota": true,
+        "range_read": true,
+        "read": true,
+        "rename": true,
+        "search_server": false,
+        "server_side_copy": true,
+        "server_side_move": true,
+        "stat": true,
+        "versions": false,
+        "watch": false,
+        "write": true
+      },
+      "ui": {
+        "pathstyle": false,
+        "ps": false,
+        "region": false,
+        "repo_id": false,
+        "s3like": false
+      }
+    },
+    "webdav": {
+      "caps": {
+        "checksum_etag": false,
+        "chmod": false,
+        "delete": true,
+        "keep_versions_on_restore": true,
+        "list": true,
+        "max_upload_size": -1,
+        "mkdir": true,
+        "mkfile": false,
+        "multipart": false,
+        "notes": "WebDAV: 支持 COPY/MOVE 服务端复制",
+        "object_lock": false,
+        "presign": false,
+        "protocol": "webdav",
+        "quota": false,
+        "range_read": true,
+        "read": true,
+        "rename": true,
+        "search_server": false,
+        "server_side_copy": true,
+        "server_side_move": true,
+        "stat": true,
+        "versions": false,
+        "watch": false,
+        "write": true
+      },
+      "ui": {
+        "pathstyle": false,
+        "ps": false,
+        "region": false,
+        "repo_id": false,
+        "s3like": false
+      }
+    }
+  },
+  "version": "6.16.21"
+}

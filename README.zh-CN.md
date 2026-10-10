@@ -90,8 +90,24 @@ journalctl -u fonriv -f
 
 本发行版（社区版）以 AGPL-3.0 开源，包含上表全部能力；以下能力**未随包发布**（相关模块不在开源发行中）：分享管理（局域网分享向导 / HTTP 链接 / SMB 账号与权限）、多云文件管理 FonrVFS、智能存储池 CloudPool、跨模块传输 flow、LVM/ZFS/RBD/PBS 等存储卷管理。
 
+## 从源码构建
+
+```bash
+# 源码即本仓库（tar 包内也是完整源码）。
+python3 -m venv venv && venv/bin/pip install -r requirements.txt
+sudo bash scripts/install.sh --yes
+
+# 或自行打包（产物在 dist/）
+bash packaging/build_tarball.sh            # tar.gz + sha256
+bash packaging/build_deb.sh                # deb（Debian 12 / Ubuntu 22.04+）
+```
+
 ## 许可
 
 Fonriv 社区版以 **GNU AGPL-3.0** 发布，详见 [LICENSE](LICENSE)。
 可自由使用、修改与再分发；以网络服务形式提供修改版时，须按同许可证向用户提供对应源码。
-版权所有 © 2026 Fonriv。
+- **源码仓库**：<https://github.com/lxrmyc/fonriv/>
+- **官网**：[www.fonriv.com](https://www.fonriv.com) —— 文档、下载与更多信息
+- **联系微信**：`lxrmyc`
+
+版权所有 © 2026 Fonriv。本程序不含任何担保；详情见许可证全文。
