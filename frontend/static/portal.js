@@ -47,8 +47,8 @@
   }
 
   /* ── 面板动作候选: 来自 NAV_TREE(含二级) ── */
-  // v6.16.14 · 档位裁剪(用户要求: Ctrl+G 传送门清除非社区版条目):
-  //   ① 子项 feat 未授权 → 不列; ② hideEditions 命中当前档位(如「核心运行状况」社区隐藏) → 不列;
+  // v6.16.14 · 功能裁剪(Ctrl+G 传送门清除非社区版条目):
+  //   ① 子项 feat 未授权 → 不列; ② hideEditions 命中社区版(如「核心运行状况」社区隐藏) → 不列;
   //   ③ **组节点**: 若其子项全部被裁掉(如「分享管理」整组 pro) → 组节点本身也不列。
   function _itemAllowed(it, node) {
     try {
@@ -72,7 +72,7 @@
       var _grpIt = { kind: 'panel', label: grp.label || grp.key, sub: '面板',
                      target: { type: 'panel', panel: grp.key }, feat: grp.feat };
       var _grpOk = _itemAllowed(_grpIt, grp);
-      // 组节点: 有子项但**全部被档位裁掉**时(如「分享管理」整组 pro) → 组节点也不列
+      // 组节点: 有子项但**全部被裁掉**时(如「分享管理」整组非社区) → 组节点也不列
       if (grp.children && grp.children.length && _kids.length === 0) _grpOk = false;
       out = out.concat(_kids);
       if (_grpOk) out.push(_grpIt);

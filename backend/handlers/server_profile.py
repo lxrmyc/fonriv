@@ -361,7 +361,7 @@ async def handle_sp_save(ws, data: dict):
     hostname = (payload.get("hostname") or "").strip()
     conn = get_conn()
 
-    # ── 档位限额: 上限由 backend/license.limits() 给出 (开源社区版 0 = 不限) ──
+    # ── 数量限额: 上限由 backend/license.limits() 给出 (开源社区版 0 = 不限) ──
     #   注: 所有页面(文件传输/VNC 直链/PVE 控制台/网络共享/远端磁盘/备份中心)共用 server_profiles 一张表,
     #   所以这里按**该用户总行数**计, 与用户看到的一致。
     _is_new = True
@@ -1002,7 +1002,7 @@ async def handle_sp_import(ws, data: dict):
     conn = get_conn()
     created = skipped = 0
     errors = []
-    # ── v5.83.3 · 档位限额: 导入同样受限(否则导入 N 条即可绕过) ──
+    # ── v5.83.3 · 数量限额: 导入同样受限(否则导入 N 条即可绕过) ──
     _mx_imp = 0
     try:
         from backend import license as _L
@@ -1526,4 +1526,4 @@ async def handle_sp_wol(ws, data: dict):
                             "msg": f"发送失败: {e}"})
 
 
-# v6.16.14 · 会话录制三动作已迁至 handlers/vnc_rec.py (随该文件按档位整体剪除; 社区/专业包不保留录制源码)
+# v6.16.14 · 会话录制三动作已迁至 handlers/vnc_rec.py (该模块不在本发行包时不注册)

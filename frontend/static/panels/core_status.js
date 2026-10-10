@@ -617,7 +617,7 @@
         (L.note ? '<div style="font-size:10px;color:var(--orange);margin-top:4px">'+esc(L.note)+'</div>' : '')+
         '</div>';
     });
-    /* v1.0.0 · 社区版: 无远程授权/档位/到期概念 —— 原"授权与激活 + 实例ID(分叉锚点)"卡片已移除 */
+    /* v1.0.0 · 社区版: 无远程授权/到期概念 —— 原"授权与激活 + 实例ID(分叉锚点)"卡片已移除 */
     var fe = r.features || {};
     h += '<div style="font-size:11px;color:var(--text3);margin:12px 0 6px">功能分组 ('+(fe.groups||0)+' 组)</div>';
     // 用户权限矩阵

@@ -44,7 +44,7 @@
     var sum = $id('depsSummary');
     if (!tb) return;
     // v6.16.2 批20 · 社区版不显示具体依赖表格: render() 此前 display='' 会覆盖 index.html 的
-    //   data-hide-editions(扫描一次表格就复活) —— 这里按档位显式压制(用户实测: 按钮下方仍列出
+    //   data-hide-editions(扫描一次表格就复活) —— 这里按功能键显式压制(实测: 按钮下方仍列出
     //   rsync 传输引擎/SSH 密码认证/rclone 对象存储引擎 三项)
     var isCommEarly = (window.__licFeatEdition || 'community') === 'community';
 

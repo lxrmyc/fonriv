@@ -149,8 +149,8 @@ def collect_recent(uid: int, limit: int = 40) -> List[Dict[str, Any]]:
 
 
 def _allowed_kinds() -> set:
-    """v6.16.14 · 档位裁剪(用户要求: Ctrl+G 传送门清除非社区版功能条目):
-    storage/path 源自 FonrVFS(专业档), 未授权时整体不检索不显示。"""
+    """v6.16.14 · 功能裁剪(Ctrl+G 传送门清除非社区版功能条目):
+    storage/path 源自 FonrVFS(本发行包不含该模块), 不从检索结果中出现。"""
     try:
         from backend import license as _L
         if not _L._status_allows(_L.get_status_summary(), "fonrvfs"):
@@ -173,7 +173,7 @@ async def search(uid: int, admin: bool, query: str, kinds: Optional[List[str]] =
         items += collect_recent(uid)
     # kinds 过滤必须在**收集之后**再按 kind 落地: collect_hosts 顺带产出云/共享节点(同源于 hub),
     # 若只靠"是否调用某个收集器"来过滤, kinds=host 会混进 storage (实测抓到)。
-    # v6.16.14 · 档位裁剪: 未授权 kind(storage/path=FonrVFS 专业档)无论调用方是否显式指定都剔除。
+    # 功能裁剪: kind=storage/path(FonrVFS, 本发行包不含)无论调用方是否显式指定都剔除。
     _allow = _allowed_kinds()
     items = [it for it in items if it.get("kind") in _allow]
     if kinds:

@@ -262,7 +262,7 @@ async def handle_db_user_create(ws, data):
     if db.user_get(username):
         await ws.send_json({"type": "result", "status": "error", "msg": "用户名已存在"})
         return
-    # ── 档位限额: 上限由 backend/license.limits() 给出 (开源社区版 0 = 不限) ──
+    # ── 数量限额: 上限由 backend/license.limits() 给出 (开源社区版 0 = 不限) ──
     try:
         from backend import license as _L
         _mx = int((_L.limits() or {}).get("max_users") or 0)

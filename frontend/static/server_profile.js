@@ -498,7 +498,7 @@ var HOST_ITEMS = [['cpu','🖥 CPU 使用率'], ['mem','🧠 内存'], ['disk','
                   ['net','📡 网络上下行'], ['load','📈 系统负载'], ['sys','🕒 运行时长'],
                   ['os','🏷 操作系统'], ['kern','🐧 内核 / 架构'], ['hostname','🖧 主机名'],
                   ['pool','🧊 存储池状态'], ['sess','🔌 活跃会话数']];
-/* v6.16.14 · 档位裁剪: 「存储池状态」属旗舰 cloudpool → 未授权时不出现在宿主机区与左栏模块设置里 */
+/* v6.16.14 · 功能裁剪: 「存储池状态」属 cloudpool → 社区版不出现在宿主机区与左栏模块设置里 */
 var HOST_ITEM_FEAT = { pool: 'cloudpool' };
 function _hostItemAllowed(k){
   var f = HOST_ITEM_FEAT[k];
@@ -673,8 +673,8 @@ function _sideModApply(){
   if (hs) hs.style.display = (m.host === false) ? 'none' : '';
   var as = document.getElementById('quickActionsSection');
   if (as){
-    /* v6.3.43 · 批 C: 「快捷操作」区显隐。注意它是**档位声明式隐藏**的元素
-       (data-hide-editions="community"): 我们放开时不能直接写 '' 把档位规则冲掉,
+    /* v6.3.43 · 批 C: 「快捷操作」区显隐。注意它是**功能键声明式隐藏**的元素
+       (data-hide-editions="community"): 我们放开时不能直接写 '' 把隐藏规则冲掉,
        必须让 applyEditionHides() 再跑一次(单一真源)。 */
     if (m.actions === false) as.style.display = 'none';
     else { as.style.display = ''; try { if (window.applyEditionHides) window.applyEditionHides(); } catch(e){} }

@@ -130,6 +130,10 @@ var _STORAGE_KEY = 'tri_pane_items_v1';
     try {
       if (!it) return it;
       if (it.src) it.src = _normPath(it.src);
+      /* v1.0.0 · FIX(用户实测: 传目录后目录名丢失, 内容被摊到目标目录里):
+         栏里给目录的路径带尾斜杠, 而 rsync 对"带尾斜杠"的源按**目录内容**处理。
+         这里统一去掉尾部斜杠 → rsync 会在目标下创建同名目录。 */
+      if (it.src && it.src.length > 1) it.src = String(it.src).replace(/\/+$/, '');
       if (it.dst && String(it.dst).trim() !== '/') it.dst = _normPath(it.dst);
       return it;
     } catch(e){ return it; }
@@ -149,6 +153,8 @@ var _STORAGE_KEY = 'tri_pane_items_v1';
     return 'up';
   }
   function _autoDirectionBySource(fromLeft){
+    /* v1.0.0 · FIX(用户实测: 双向同步加项后被自动切成单向推送): sync 是显式选择, 不参与自动切换 */
+    if (_direction === 'sync') return 'sync';
     var src = fromLeft ? _leftSide : _rightSide;
     var dst = fromLeft ? _rightSide : _leftSide;
     var d = _mapDirBySides(src, dst);
@@ -177,6 +183,9 @@ var _STORAGE_KEY = 'tri_pane_items_v1';
     if (!item.dst) item.dst = '';
     if (!item.server) item.server = _activeServerId || 'local';
     if (!item.mode) item.mode = _direction === 'down' ? 'pull' : (_direction === 'sync' ? 'sync' : 'push');
+    // v1.0.0 · 两侧服务器(旧 localStorage 项无此字段 → 按 mode 推导)
+    if (!item.srcSrv) item.srcSrv = (item.mode === 'pull') ? (item.server || 'local') : 'local';
+    if (!item.dstSrv) item.dstSrv = (item.mode === 'pull') ? 'local' : (item.server || 'local');
     if (item.addedAt == null) item.addedAt = Date.now();
     _normItem(item);   // v5.7.0 · 规范化 src/dst
     for (var i=0;i<_items.length;i++){
@@ -228,77 +237,44 @@ var _STORAGE_KEY = 'tri_pane_items_v1';
   // 当前远端 cwd（用于"自动作为 dst"）
   var _remoteCwd = '/';
   var _localCwd  = '/';
-  // v4.38.21 rev · 用户在远端栏点选的目标目录（覆盖 _remoteCwd）
-  var _targetDir = null;  // null 表示用 _remoteCwd；非 null 是用户显式选的 dst
-  function _setTargetDir(p, isRemote){
-    if (isRemote){
-      _targetDir = p || null;
-    } else {
-      _targetDir = p || null;
-    }
-    _applyTargetDir();
+  /* v1.0.0 · 目标模型重做(用户要求"去除目标选择"): 传输落到**对侧栏当前打开的目录**。
+     - 每栏独立记录 cwd 与已连接服务器(支持双远端 cross / 双本地 same 不再互相覆盖)
+     - 不再有"显式选目标目录"(_targetDir/onTargetSelect/📌目标条 全部移除)
+     - 加项时自动填 dst = 对侧栏 cwd; 对侧栏切换目录时, 未开始的项自动跟随 */
+  var _leftCwd = '/', _rightCwd = '/';
+  var _leftSrvId = 'local', _rightSrvId = 'local';
+  /* v1.0.0 · 目标 = 对侧栏当前目录。只做两件事:
+     ① 清掉历史版本遗留的"📌 目标"指示条(旧 UI 痕迹)
+     ② 把**未开始**的项 dst 跟随对侧栏 cwd(用户"点开哪个目录就传到哪个目录") */
+  function _dstForItem(it){
+    var fromRight = it && it._fromPos === 'right';
+    if (fromRight) return _leftCwd || '/';
+    return _rightCwd || '/';
   }
   function _applyTargetDir(){
-    // 1) 视觉提示
-    var panes = _host ? _host.querySelectorAll('.tp-grid .dpb-pane[data-side="remote"]') : [];
-    panes.forEach(function(pane){
-      // 显示"目标"行
-      var ind = pane.querySelector('.dpb-target-ind');
-      if (!ind){
-        ind = document.createElement('div');
-        ind.className = 'dpb-target-ind';
-        ind.style.cssText = 'padding:3px 10px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:11px;color:var(--text2);display:flex;align-items:center;gap:6px';
-        var list = pane.querySelector('.dpb-list');
-        if (list && list.parentNode) list.parentNode.insertBefore(ind, list);
-      }
-      var target = _targetDir || _remoteCwd;
-      ind.innerHTML = '<span>📌 目标：</span><code style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--cyan)">'
-        + (target || '/').replace(/[<>&"']/g, function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]})
-        + '</code><button class="btn btn-sm dpb-target-clear" style="padding:1px 6px;font-size:10px">清</button>';
-      var clr = ind.querySelector('.dpb-target-clear');
-      if (clr) clr.onclick = function(){
-        _targetDir = null;
-        _applyTargetDir();
-      };
-      // 高亮当前 targetDir 所在项
-      var items = pane.querySelectorAll('.dpb-item');
-      items.forEach(function(it){
-        var ip = it.getAttribute('data-path') || '';
-        if (_targetDir && (ip + '/') === _targetDir){
-          it.classList.add('dpb-target');
-          it.style.outline = '2px solid var(--green)';
-          it.style.outlineOffset = '-2px';
-        } else {
-          it.classList.remove('dpb-target');
-          it.style.outline = '';
-          it.style.outlineOffset = '';
-        }
+    try {
+      var panes = _host ? _host.querySelectorAll('.tp-grid .dpb-pane[data-side="remote"]') : [];
+      panes.forEach(function(pane){
+        var ind = pane.querySelector('.dpb-target-ind');
+        if (ind && ind.parentNode) ind.parentNode.removeChild(ind);
       });
-    });
-    // 2) 自动配对 pending src-only 项
-    var dst = _targetDir || _guessDst();
-    if (dst && dst !== '/'){
-      for (var i=0;i<_items.length;i++){
-        if (_needsDst(_items[i])){
-          _items[i].dst = dst;
-          _items[i].mode = _direction === 'down' ? 'pull' : 'push';
-          if (!_items[i].server || _items[i].server === 'local' || _items[i].server === 'l'){
-            _items[i].server = _activeServerId || 'local';
-          }
-        }
-      }
-      _saveItems();
-      _fireChange();
+    } catch(e){}
+    var changed = false;
+    for (var i=0;i<_items.length;i++){
+      var it = _items[i];
+      if (!it || !it.src) continue;
+      if (it._running) continue;                       // 正在跑的不改
+      if (it.dst && it.dst !== '/' && !it._autoDst) continue;  // 用户手填的不覆盖
+      var d = _dstForItem(it);
+      if (d && d !== '/' && d !== it.dst){ it.dst = d; it._autoDst = true; changed = true; }
     }
+    if (changed){ _saveItems(); _fireChange(); }
   }
   // v4.38.21 rev · 在 src 加入时自动以"对侧 cwd"作为 dst
   // 这样用户只点本地文件的 ➕ 即可：远程已经导航到目标目录时，dst 自动填上
   function _guessDst(){
-    // 优先用用户显式选的目标，否则用远端/本地 cwd
-    if (_targetDir) return _targetDir;
-    // direction=up: 推到远端，dst = 远端 cwd；direction=down: 拉到本地，dst = 本地 cwd
-    if (_direction === 'down') return _localCwd;
-    return _remoteCwd;
+    /* v1.0.0 · dst 一律取**对侧(右)栏当前目录** —— 双远端/双本地也不混淆 */
+    return _rightCwd || _remoteCwd || '/';
   }
   // v4.38.21 rev · 若刚加的 src 项有对侧 cwd，立即补全 dst
   // 注意：dst === '/' 也算未设置（用户没真正选目标）
@@ -321,15 +297,17 @@ var _STORAGE_KEY = 'tri_pane_items_v1';
   }
   function _addFromLeft(p){
     try { _autoDirectionBySource(true); } catch(e){}
-    // left 是 UI 位置: src 来自哪一侧基于 direction 决定
-    // direction='up' (本地→远端): left=local → src=p, dst=空(待补)
-    // direction='down' (远端→本地): left=remote → src=p, dst=空(待补)
-    // direction='sync': left=local, src=p
+    /* v1.0.0 · 记下"从哪一栏加的"与两侧服务器 —— 传输方向由两侧推导(与后端契约同口径),
+       dst 一律取对侧(右)栏当前目录。 */
     var side = _leftSide;
     var item = {
-      src: p,           // 左侧的路径作为 src
-      dst: '',          // 右侧路径待用户填入（或由对侧 cwd 自动填入）
-      server: side === 'remote' ? (_activeServerId || 'local') : 'local',
+      src: p,
+      _isDir: /\/$/.test(p),   // v1.0.0 · 源是否目录(跨机时目标要带上目录名)
+      dst: '',
+      server: side === 'remote' ? (_leftSrvId || _activeServerId || 'local') : 'local',
+      srcSrv: side === 'remote' ? (_leftSrvId || 'local') : 'local',
+      dstSrv: _rightSide === 'remote' ? (_rightSrvId || 'local') : 'local',
+      _fromPos: 'left',
       mode: _direction === 'down' ? 'pull' : (_direction === 'sync' ? 'sync' : 'push'),
     };
     // v4.38.21 rev · 智能 dst：对侧已有 cwd 时直接填入（最常见 UX）
@@ -345,7 +323,7 @@ var _STORAGE_KEY = 'tri_pane_items_v1';
     // 智能补全：如果 _items 末尾存在"仅有 src、dst 空"的项，附加到它的 dst
     // 否则新建 dst-only 项
     var side = _rightSide;
-    var server = side === 'remote' ? (_activeServerId || 'local') : 'local';
+    var server = side === 'remote' ? (_rightSrvId || _activeServerId || 'local') : 'local';
     var mode = _direction === 'down' ? 'pull' : 'push';
     // 倒序找最近一个 src 存在但 dst 为空的项
     var pairedIdx = -1;
@@ -357,18 +335,23 @@ var _STORAGE_KEY = 'tri_pane_items_v1';
     }
     if (pairedIdx >= 0){
       _items[pairedIdx].dst = p;
-      if (server && server !== 'local') _items[pairedIdx].server = server;
+      _items[pairedIdx]._autoDst = false;   // 用户显式指定的目标(右栏加入)
+      if (server && server !== 'local'){ _items[pairedIdx].server = server; _items[pairedIdx].dstSrv = server; }
       if (mode) _items[pairedIdx].mode = mode;
       _saveItems();
       _fireChange();
       _toast('已补全目的: ' + p, 'ok');
       return;
     }
-    // 没有可补全项，新建 dst-only
+    // 没有可补全项，新建 dst-only (从右栏发起 → 源在对侧/左侧)
     var item = {
       src: '',
       dst: p,
       server: server,
+      _isDir: false,
+      srcSrv: _leftSide === 'remote' ? (_leftSrvId || 'local') : 'local',
+      dstSrv: side === 'remote' ? (_rightSrvId || 'local') : 'local',
+      _fromPos: 'right',
       mode: mode,
     };
     if (addItem(item)) _toast('已加入目的: ' + p, 'ok');
@@ -737,6 +720,12 @@ var _STORAGE_KEY = 'tri_pane_items_v1';
     //   凭据直接通过 setAuthOverride 闭包传递 (与 disk_manager getConn() 同语义)。
     //   DOM 字段仅在用户手动填写时使用。
     _activeServerId = srv.id;
+    // v1.0.0 · 按栏记录服务器(双远端 cross 时左右栏各自持有, 供方向推导)
+    try {
+      var _pos = (_tgt === _leftPane) ? 'left' : ((_tgt === _rightPane) ? 'right'
+                 : ((_rightSide === 'remote') ? 'right' : 'left'));
+      if (_pos === 'left') _leftSrvId = srv.id; else _rightSrvId = srv.id;
+    } catch(e){}
     // v4.40.0 · 连接普通 SSH 服务器 -> 恢复 SSH 模式 (v4.96.0: cross 下按所在栏连接)
     var _pR = _tgt || (function(){
       if (_rightSide === 'remote') return _rightPane;
@@ -1007,7 +996,7 @@ function renderServerBar(){
       var dstEl2 = bar.querySelector('.tp-srv-dst');
       if (dstEl2){
         var lbl2 = (cur && (cur.label || cur.host)) || '本机';
-        var dir2 = _targetDir || _remoteCwd || '/';
+        var dir2 = _rightCwd || _remoteCwd || '/';
         dstEl2.textContent = '📍 ' + lbl2 + ':' + dir2;
         dstEl2.title = '当前目标目录: ' + lbl2 + ':' + dir2;
       }
@@ -1036,7 +1025,7 @@ function renderServerBar(){
         var dstEl3 = bar.querySelector('.tp-srv-dst');
         if (dstEl3){
           var lbl3 = (srv.label || srv.host);
-          var dir3 = srv.mount || _targetDir || _remoteCwd || '/';
+          var dir3 = srv.mount || _rightCwd || _remoteCwd || '/';
           dstEl3.textContent = '📍 ' + lbl3 + ':' + dir3;
           dstEl3.title = '当前目标目录: ' + lbl3 + ':' + dir3;
         }
@@ -1201,7 +1190,7 @@ function renderServerBar(){
       inp.addEventListener('change', function(){
         var id = inp.getAttribute('data-id');
         for (var i=0;i<_items.length;i++){
-          if (_items[i].id === id){ _items[i].dst = inp.value; _saveItems(); break; }
+          if (_items[i].id === id){ _items[i].dst = inp.value; _items[i]._autoDst = false; _saveItems(); break; }
         }
       });
     });
@@ -1385,56 +1374,25 @@ function renderServerBar(){
       // v4.38.21 rev · 记录远端/本地 cwd 供自动配对
       if (side === 'remote') _remoteCwd = cwd;
       else _localCwd = cwd;
+      // v1.0.0 · 每栏独立 cwd(双远端/双本地各记各的)
+      if (isLeft) _leftCwd = cwd; else _rightCwd = cwd;
       // v4.38.34 · 目标目录指示条: 📍 srv:cwd (远端浏览到哪里 = 传输目标位置)
       try {
         var dstEl = _host && _host.querySelector('.tp-srv-dst');
         if (dstEl){
           var cur = _getServerById(_activeServerId);
           var lbl = (cur && (cur.label || cur.host)) || '本机';
-          var dir = (side === 'remote') ? cwd : (_targetDir || _remoteCwd);
+          var dir = (side === 'remote') ? cwd : (_leftCwd || _rightCwd || _remoteCwd);
           dstEl.textContent = '📍 ' + lbl + ':' + (dir || '/');
           dstEl.title = '当前目标目录: ' + lbl + ':' + (dir || '/');
         }
       } catch(e){}
       // 如果有待补全 dst 的 src-only 项，把新 cwd 应用到它们
-      if (side === 'remote' && !_targetDir){
-        for (var i=0;i<_items.length;i++){
-          if (_needsDst(_items[i])){
-            _items[i].dst = cwd;
-            _items[i].mode = _direction === 'down' ? 'pull' : 'push';
-            if (!_items[i].server || _items[i].server === 'local' || _items[i].server === 'l'){
-              _items[i].server = _activeServerId || 'local';
-            }
-          }
-        }
-        _saveItems();
-        _fireChange();
-      }
-      _applyTargetDir();  // 更新"目标"行显示
-    },
-    onTargetSelect: function(p){
-      // v4.38.21 rev · 用户在远端栏显式选了目标目录
-      // v4.38.22 · 单击=进入+设目标（在 dir click handler 中已 load，触发 onCwdChange 即可）
-      _targetDir = p;
-      // v1.0.0 · FIX(用户实测"目标已经选了的, 却提示缺目标目录"): 原先只有"进入目录(onCwdChange)"
-      //   会补全待定项, 且在 _targetDir 已设时被跳过 → 先加项后选目标时 dst 永远为空。
-      //   这里在显式选目标时把所有 src-only 项补上 dst。
-      try {
-        var _n = 0;
-        for (var i=0;i<_items.length;i++){
-          if (_needsDst(_items[i])){
-            _items[i].dst = p;
-            _items[i].mode = _direction === 'down' ? 'pull' : (_direction === 'sync' ? 'sync' : 'push');
-            if (!_items[i].server || _items[i].server === 'local' || _items[i].server === 'l'){
-              _items[i].server = _activeServerId || 'local';
-            }
-            _n++;
-          }
-        }
-        if (_n){ _saveItems(); _fireChange(); _toast('已把选中的目标目录应用到 ' + _n + ' 个待定传输项', 'ok'); }
-      } catch(e){}
+      /* v1.0.0 · 对侧栏目录变了 → 未开始的项自动跟随(目标 = 对侧栏当前目录) */
       _applyTargetDir();
     },
+    /* v1.0.0 · 移除 onTargetSelect: 不再有"点目录设为传输目标"的交互 ——
+       用户在远端栏点开哪个目录, 传输就落到哪个目录(见 _applyTargetDir)。 */
   });
   return pane;
   }

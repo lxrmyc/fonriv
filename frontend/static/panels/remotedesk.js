@@ -422,7 +422,7 @@
       if (window.__featInEdition && !window.__featInEdition('vnc_record')) return;
       send({ action: 'vnc_rec_list' }, function (r) {
         if (!box) return;
-        if (r && r.status === 'error' && /授权|旗舰/.test(r.msg || '')){
+        if (r && r.status === 'error' && /不在社区版内|社区版不含|未授权/.test(r.msg || '')){
           box.innerHTML = '<span style="color:var(--text3);font-size:12px">🔒 ' + esc(r.msg) + '</span>';
           return;
         }

@@ -1064,7 +1064,7 @@ async def api_vnc_rec_upload(request: Request,
     _check_api_auth(token or x_auth_token)
     from backend import license as lic
     if not lic.feature_enabled("vnc_record"):
-        return JSONResponse({"status": "error", "msg": "会话录制不在当前档位内"}, status_code=403)
+        return JSONResponse({"status": "error", "msg": "当前发行包不含会话录制模块"}, status_code=403)
     # v1.0.0 · 本发行版不含会话录制模块 → 501 (不再抛 ModuleNotFoundError)
     try:
         from backend.handlers import vnc_rec
@@ -1097,7 +1097,7 @@ async def api_vnc_rec_download(f: str = Query(""),
     except ImportError:
         return JSONResponse({"status": "error", "msg": "会话录制未包含在本发行版中"}, status_code=501)
     if not _feature_ok():
-        return JSONResponse({"status": "error", "msg": "会话录制不在当前档位内"}, status_code=403)
+        return JSONResponse({"status": "error", "msg": "当前发行包不含会话录制模块"}, status_code=403)
     if not _re.match(r"^rec_\w{8,15}_[A-Za-z0-9_.-]{1,64}\.webm$", f or ""):
         return JSONResponse({"status": "error", "msg": "非法文件名"}, status_code=400)
     fp = os.path.join(_dir(), f)

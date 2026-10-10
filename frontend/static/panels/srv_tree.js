@@ -159,7 +159,7 @@ function _nodeClick(guid, kind) {
   if (g.toast) g.toast('请在「连接中心」管理该' + (kind === 'share' ? '共享' : '节点'), 'info', 3000);
 }
 
-/* 树里可见的节点(云存储按档位: 社区版不含 cloud → 整类不出现) */
+/* 树里可见的节点(云存储按功能键: 社区版不含 cloud → 整类不出现) */
 function _visibleNodes() {
   return nodesNow().filter(function (n) {
     if (n.kind === 'share') return true;

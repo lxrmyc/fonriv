@@ -1,4 +1,4 @@
-/* v4.48.0 P4 · Docker 容器管理面板 (旗舰专属 · feat=docker)
+/* v4.48.0 P4 · Docker 容器管理面板 (feat=docker)
  * 依赖 window.send / switchTab · 与 backend/handlers/docker.py 对应
  */
 (function(g){
@@ -257,7 +257,7 @@
           + '<button class="btn btn-sm" title="日志" onclick="Docker.logs(\'' + esc(c.name) + '\')">📋</button> '
           // v5.19.0 · 容器备份 (export 文件系统快照 / commit 完整镜像)
           + '<button class="btn btn-sm" style="color:var(--green)" title="备份容器 (导出为 tar)" onclick="Docker.backupContainer(\'' + esc(c.name) + '\')">💾</button> '
-          // v5.84.0 · 该链接把产物目录接入「跨模块自动备份」(企业档 flow) → 未授权/社区版不显示
+          // v5.84.0 · 该链接把产物目录接入「跨模块自动备份」(flow 键, 非社区功能) → 社区版不显示
           + ((typeof licenseFeatEnabled === 'function' && !licenseFeatEnabled('flow')) ? ''
               : '<button class="btn btn-sm" style="color:var(--cyan)" title="把容器备份产物目录加入跨模块自动备份 (定时上传到远端/云)" onclick="Docker.flowAdd(\'container\',\'' + esc(c.name) + '\')">🔗</button> ')
           + '<button class="btn btn-sm" style="color:var(--red)" title="删除容器(不可恢复)" onclick="Docker.rm(\'' + esc(c.name) + '\')">🗑</button>'
@@ -288,7 +288,7 @@
           + '<td style="font-size:11px">' + esc(m.size) + '</td>'
           + '<td style="font-size:11px">' + esc(m.created) + '</td>'
           + '<td style="white-space:nowrap"><button class="btn btn-sm" style="color:var(--green)" title="备份该镜像 (docker save)" onclick="Docker.backupImage(\'' + esc(full) + '\')">💾 备份</button> '
-          // v5.86.0 · 与容器行同口径: 该链接把产物目录接入「跨模块自动备份」(企业档 flow) → 未授权/社区版不显示
+          // v5.86.0 · 与容器行同口径: 该链接把产物目录接入「跨模块自动备份」(flow 键, 非社区功能) → 社区版不显示
           + ((typeof licenseFeatEnabled === 'function' && !licenseFeatEnabled('flow')) ? ''
               : '<button class="btn btn-sm" style="color:var(--cyan)" title="把镜像备份产物目录加入跨模块自动备份" onclick="Docker.flowAdd(\'image\',\'' + esc(full) + '\')">🔗</button>') + '</td></tr>';
       });

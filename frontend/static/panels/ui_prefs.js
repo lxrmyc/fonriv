@@ -71,7 +71,7 @@
     {id:'vdisk_cloud',      label:'💠 多云虚拟存储池',     action:'tab:vdisk_cloud'},
   ];
 
-  /* v6.16.14 · 按档位过滤可选项(用户要求: 快捷操作里清除非社区版功能按钮):
+  /* v6.16.14 · 按功能键过滤可选项(快捷操作里清除非社区版功能按钮):
      action='tab:<key>' → 查 NAV_TREE 的 feat 键 + licenseFeatEnabled / hideEditions;
      js: 动作(立即同步/带宽监控)恒保留。列表在**渲染时**过滤(license 白名单晚于模块加载)。 */
   function _actAllowed(x){
@@ -90,7 +90,7 @@
       if (node.hideEditions.indexOf(edn) >= 0) return false;
     }
     /* v6.16.17 · license_get 未回来时 __licFeat=null → licenseFeatEnabled 恒放行,
-       按档位表兜底(默认 community), 社区版首屏即不显示非社区按钮 */
+       按社区内置功能表兜底(默认 community), 社区版首屏即不显示非社区按钮 */
     if (node.feat && !window.__licFeat){
       var _lst = (window.RP_FEATURE_EDITIONS || {})[window.__licFeatEdition || 'community'];
       if (Array.isArray(_lst) && _lst.indexOf(node.feat) < 0) return false;
@@ -276,7 +276,7 @@
     var grid = (_actStyle() === 'grid');
     var html = '';
     (STATE.quick_actions || []).forEach(function(it){
-      if (!_actAllowed(it)) return;   // v6.16.17 · 渲染时按档位过滤: 存档里残留的非社区项不再显示
+      if (!_actAllowed(it)) return;   // v6.16.17 · 渲染时按功能键过滤: 存档里残留的非社区项不再显示
       var lbl = (it.label || '').replace(/</g,'&lt;');
       var id = (it.id || '');
       html += grid
@@ -359,7 +359,7 @@
         }
         if (Array.isArray(r.prefs.quick_actions) && r.prefs.quick_actions.length){
           /* v6.16.17 · 原 v4.38.37「缺 disk_manager 自动补上」删除: 它名为一次性、实为**每次
-             加载都跑**, 用户删掉的「💽 远端磁盘管理」重进必复活(用户报障"删除不掉"), 且不按档位过滤。 */
+             加载都跑**, 用户删掉的「💽 远端磁盘管理」重进必复活(报障"删除不掉"), 且不按功能键过滤。 */
           STATE.quick_actions = r.prefs.quick_actions;
         }
         STATE.loaded = true;
@@ -489,12 +489,12 @@
   /* v6.16.17 · 删除即落库: 原先只改内存不保存, 不点「💾 保存快捷操作」重进即回(用户报障) */
   function remove(idx){ STATE.quick_actions.splice(idx, 1); renderQuickEditor(); renderQuickList(); save(); }
   function add(id){
-    if (!availActions().some(function(x){ return x.id === id; })){ try{ toast('该功能当前档位不可用', 'warn'); }catch(e){} return; }
+    if (!availActions().some(function(x){ return x.id === id; })){ try{ toast('该功能不在社区版内', 'warn'); }catch(e){} return; }
     var item = AVAILABLE_ACTIONS.filter(function(x){ return x.id === id; })[0];
     if (!item) return;
     STATE.quick_actions.push(item); renderQuickEditor(); renderQuickList();
   }
-  /* v6.16.17 · 恢复默认同样按档位过滤, 社区版不得借「恢复默认」复活非社区按钮 */
+  /* v6.16.17 · 恢复默认同样按功能键过滤, 社区版不得借「恢复默认」复活非社区按钮 */
   function resetQuick(){ STATE.quick_actions = DEFAULT_QUICK.filter(_actAllowed); renderQuickEditor(); renderQuickList(); }
 
   window.UIPrefs = { load:load, bindForm:bindForm, save:save, move:move, remove:remove, add:add,

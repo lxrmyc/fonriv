@@ -590,17 +590,17 @@ async def stop():
 # ═════════════════════════════════════════════════════════════
 
 def _sched_license_ok(feat: str) -> bool:
-    """v6.16.14 · 定时任务档位校验(用户要求: 非社区版功能清除; 此前 schedule_create 是社区键,
-    可绕过档位创建 flow/dbbackup/云上传等高级任务 —— 属功能外溢)。
+    """v6.16.14 · 定时任务功能校验(非社区版功能清除; 此前 schedule_create 是社区键,
+    可绕过校验创建 flow/dbbackup/云上传等高级任务 —— 属功能外溢)。
     未授权 → 记日志并跳过本次执行(不抛错, 避免刷爆任务日志)。"""
     try:
         from backend import license as _L
         if _L.feature_enabled(feat):
             return True
-        log.warning("定时任务档位不足, 已跳过: 需要功能键 %s (当前档位不含)", feat)
+        log.warning("定时任务功能校验未通过, 已跳过: 需要功能键 %s (本发行包不含)", feat)
         return False
     except Exception as e:
-        log.warning("定时任务档位校验异常(按允许处理): %s", e)
+        log.warning("定时任务功能校验异常(按允许处理): %s", e)
         return True
 
 
@@ -689,7 +689,7 @@ async def _action_rsync_scheduled(params: dict):
 
 async def _action_remote_upload_scheduled(params: dict):
     if not _sched_license_ok("cloud"):
-        return {"status": "skipped", "msg": "授权档位不含 cloud"}
+        return {"status": "skipped", "msg": "当前发行包不含 cloud"}
     """v4.41.0 P3-9 · 定时云上传: 定时把本机文件/目录传到远端存储 (seafile/s3/oss/cos/rclone/local)。
 
     params: remote_id(int, 必填), local_path(必填), remote_dir(可选, 默认库根),
@@ -757,7 +757,7 @@ async def _action_remote_upload_scheduled(params: dict):
 
 async def _action_flow_scheduled(params: dict):
     if not _sched_license_ok("flow"):
-        return {"status": "skipped", "msg": "授权档位不含 flow"}
+        return {"status": "skipped", "msg": "当前发行包不含 flow"}
     """v4.15.9: 定时跨模块流程。
 
     params: flow_id (必填) 或 flow_uuid (v4.39.0+)
@@ -894,7 +894,7 @@ async def _dispatch_via_headless(action: str, params: dict):
 # v5.45.0 · FonrVFS 目录同步定时 (多云文件管理): 对比 + 增量搬运 (+可选删除多余/试运行)
 async def _action_fonr_sync_scheduled(params: dict):
     if not _sched_license_ok("fonrvfs"):
-        return {"status": "skipped", "msg": "授权档位不含 fonrvfs"}
+        return {"status": "skipped", "msg": "当前发行包不含 fonrvfs"}
     """FonrVFS 目录同步定时任务。
 
     params:
@@ -989,7 +989,7 @@ register_action("flow_scheduled", _action_flow_scheduled)
 # v4.83.0 · C4 定时自动恢复演练
 try:
     from backend.worm_drill import _action_drill_scheduled
-except ImportError:  # v6.16.20 批37 · 社区包: worm_drill 剪除 (专业档)
+except ImportError:  # 本发行包不含 worm_drill 模块
     _action_drill_scheduled = None
 if _action_drill_scheduled is not None:
     register_action("drill_scheduled", _action_drill_scheduled)
@@ -1057,7 +1057,7 @@ register_action("sqlite_backup", _action_sqlite_backup)
 # v4.15.0-alpha1 · 跨模块流程执行
 async def _action_flow_run(params: dict):
     if not _sched_license_ok("flow"):
-        return {"status": "skipped", "msg": "授权档位不含 flow"}
+        return {"status": "skipped", "msg": "当前发行包不含 flow"}
     """params={'flow_id': int}"""
     try:
         fid = int(params.get("flow_id") or 0)
@@ -1081,13 +1081,13 @@ register_action("fonr_sync", _action_fonr_sync_scheduled)
 # v4.54.0 · 数据库热备定时 (MySQL/PG 热备, 复用 handlers.dbbackup 命令构造)
 async def _action_dbbackup_scheduled(params: dict):
     if not _sched_license_ok("dbbackup"):
-        return {"status": "skipped", "msg": "授权档位不含 dbbackup"}
+        return {"status": "skipped", "msg": "当前发行包不含 dbbackup"}
     """数据库热备定时: params = dbbackup_run 的参数 (db_type/db_host/.../dest_dir/keep_days)"""
     import asyncio as _asyncio
     try:
         from backend.handlers.dbbackup import _run_remote, _dump_cmd, _out_ext
-    except ImportError:  # v6.16.20 批37 · 社区包: dbbackup 剪除 (专业档)
-        return {"status": "skipped", "msg": "当前发行包未包含数据库热备模块 (专业档功能)"}
+    except ImportError:  # 本发行包不含 dbbackup 模块
+        return {"status": "skipped", "msg": "当前发行包未包含数据库热备模块"}
     from backend.ssh_lib import SSHTarget
     from datetime import datetime as _dt
 

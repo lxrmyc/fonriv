@@ -135,7 +135,7 @@ for s in preinst postinst prerm postrm; do
 done
 sed -e "s/__UNIT__/$UNIT/" "$HERE/debian/conffiles" > "$ROOT/DEBIAN/conffiles"
 SIZE=$(du -sk "$ROOT" | cut -f1)
-# 社区版描述模板 (与实物一致: 不含 FonrVFS/存储卷等专业·旗舰能力)
+# 社区版描述模板 (与实物一致: 不含 FonrVFS/存储卷等未随包能力)
 CTRL_TPL="$HERE/debian/control.community.in"
 sed -e "s/@VERSION@/$VERSION/" -e "s/@ARCH@/$DEB_ARCH/" -e "s/@SIZE@/$SIZE/" \
     -e "s/^Package: fonriv$/Package: ${PKG_NAME}/" \

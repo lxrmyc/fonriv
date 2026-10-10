@@ -19,7 +19,7 @@
       catch(e){ resolve({status:'error', msg:String(e)}); }
     });
   }
-  // v6.16.13 · 目标类型按档位裁剪: cloud→旗舰键 cloud; df→企业键 disk(远端/本机磁盘管理)
+  // v6.16.13 · 目标类型按功能键裁剪: cloud→cloud 键; df→disk 键(远端/本机磁盘管理, 非社区功能)
   function _kindsByEdition(kinds){
     try{
       var lf = window.__licFeat;                 // license_get 填充的白名单; 非数组=未拉取 → 不裁
@@ -84,7 +84,7 @@
     var row = el.closest('.browse-row') || el.parentElement;
     if (!row) return;
     el.__tpAttached = true;
-    // v6.16.13 · 档位裁剪(用户 2026-10-11 明令: 容器备份/备份配置里的 df 挂载点与远端存储属非社区能力):
+    // v6.16.13 · 功能裁剪(容器备份/备份配置里的 df 挂载点与远端存储属非社区能力):
     //   license 白名单在手时, community 档不再出现 df/cloud 两种目标。
     el.__tpCfg = { kinds: _kindsByEdition(opts.kinds || ['local','server','share','df','cloud']),
                    allowServerPush: opts.allowServerPush !== false };
@@ -114,7 +114,7 @@
     row.insertBefore(kindSel, el);
     row.insertBefore(ctx, el);
     row.appendChild(testBtn);
-    // v6.16.13 · 档位裁剪的时序兜底: license_get 白名单可能晚于面板初始化到达(实测容器备份页
+    // v6.16.13 · 功能裁剪的时序兜底: license_get 白名单可能晚于面板初始化到达(实测容器备份页
     //   首个选择器因此漏裁 df/cloud)。白名单到位后重建 kind 下拉(保留已选值)并重同步上下文。
     if (!Array.isArray(window.__licFeat)){
       (function _retryKinds(n){

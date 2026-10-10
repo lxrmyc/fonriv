@@ -8,7 +8,7 @@
   · get_status_summary()  授权面板 / 前端显隐的数据源
   · verify_license(...)   恒拒绝 —— 开源版不接受/不需要授权文件
 
-功能键 -> 档位 的映射读取 scripts/features.json (运行期真源);
+功能键 -> 是否随包内置 的映射读取 scripts/features.json (运行期真源);
 features.json 缺失时按"全部功能开放"处理 (fail-open)。
 """
 
@@ -24,11 +24,11 @@ FEATURES_JSON = os.path.join(PROJECT_ROOT, "scripts", "features.json")
 
 EDITION_LABEL = "社区版 (开源 · AGPL-3.0)"
 
-# 档位序: 开源社区版恒为 community; 非社区键 (pro/enterprise) 不放行
+# 开源社区版恒为 community; 非社区内置功能键一律不放行
 _RANK = {"community": 0, "pro": 1, "enterprise": 2}
 
 
-# ── 功能键 → 档位表 (真源 scripts/features.json) ─────────────────────────────
+# ── 功能键 → 内置表 (真源 scripts/features.json) ───────────────────────────────
 def _load_feature_editions() -> dict:
     try:
         with open(FEATURES_JSON, encoding="utf-8") as f:
@@ -50,7 +50,7 @@ FEATURE_EDITIONS = _load_feature_editions()
 
 
 def _edition_meets(cur: str, req) -> bool:
-    """当前档位是否满足需求档位; 需求为空/社区档视为放行"""
+    """社区内置是否覆盖该功能键; 需求为空视为放行"""
     if not req or req == "community":
         return True
     return _RANK.get(cur, 0) >= _RANK.get(req, 99)
@@ -62,7 +62,7 @@ def _status_allows(_status, feat: str) -> bool:
 
 
 def feature_enabled(feat: str) -> bool:
-    """功能开关: 社区键 True; pro/enterprise 键 False (与商业社区包行为一致)"""
+    """功能开关: 社区内置功能 True; 非内置功能键 False(与真源 features.json 一致)"""
     try:
         return _edition_meets("community", FEATURE_EDITIONS.get(feat, "community"))
     except Exception:
@@ -82,7 +82,7 @@ def get_status_summary() -> dict:
         "edition": "community",
         "edition_label": EDITION_LABEL,
         "message": "社区版为开源软件 (AGPL-3.0), 永久免费, 无需授权激活; 档案数与用户数不限",
-        "features_allow": None,          # None -> 前端按社区档位表过滤导航
+        "features_allow": None,          # None -> 前端按社区内置功能表过滤导航
         "feature_editions": FEATURE_EDITIONS,
         "edition_info": {"community": {"label": EDITION_LABEL, "price": "免费"}},
         "limits": limits(),

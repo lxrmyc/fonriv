@@ -100,7 +100,7 @@ body.sidebar-hard-hidden .sidebar-resizer{display:none !important}
 
 <div class="app" id="mainApp">
 <div class="topbar">
-<!-- v1.0.0 · 顶栏重构为 webui 参考稿 .nav: logo方标+旗舰徽章 → 绿点(WS) → 主菜单(flex:1) → 右上角图标组(主题/搜索/通知/语言/头像) -->
+<!-- v1.0.0 · 顶栏重构为 webui 参考稿 .nav: logo方标+状态徽章 → 绿点(WS) → 主菜单(flex:1) → 右上角图标组(主题/搜索/通知/语言/头像) -->
   <div class="logo" onclick="if(typeof openAbout==='function')openAbout()" title="点击查看软件信息与更新日志" style="cursor:pointer;display:inline-flex;flex-direction:column;align-items:center;gap:3px;line-height:1.12">
     <span style="font-size:16px;font-weight:700">fonriv<i style="font-style:normal;font-weight:500;color:var(--text3)">源流</i></span>
     <span id="logoEdition" style="font-size:12px;color:var(--green);font-weight:700;margin-top:1px;letter-spacing:.5px"></span>
@@ -181,7 +181,7 @@ body.sidebar-hard-hidden .sidebar-resizer{display:none !important}
     <!-- v1.0.0 · 批 C: 「快捷方式」+「快速操作」合并为**一个**区「快捷操作」
          两种显示样式(按钮式 / 单列式)由 UIPrefs 的 leftActionsStyle 控制;
          配置入口统一去「个性化」(旧版 ⚙ 指向老系统设置, 用户明确要求改掉) -->
-    <!-- v1.0.0 · 社区版也提供「快捷操作」(用户 2026-10-11 明令: 个性化里配了却看不到) —— 去掉档位隐藏 -->
+    <!-- v1.0.0 · 社区版也提供「快捷操作」(个性化里配了却看不到) —— 去掉功能键隐藏 -->
     <div class="sidebar-section sb-sect" id="quickActionsSection" data-sbsec="actions">
       <div class="sidebar-label" style="display:flex;justify-content:space-between;align-items:center;padding-right:8px">
         <span>快捷操作</span>
@@ -2444,7 +2444,7 @@ ssh -p 22 root@192.168.1.10 \<br>
 
     <!-- v1.0.0 · 预览方式 (三处独立: 仅预览 / 目录浏览+预览) -->
 
-    <!-- v1.0.0 · F4 流量配额 / 成本管控 · v1.0.0 社区版不展示(旗舰档能力) -->
+    <!-- v1.0.0 · 流量配额 / 成本管控 · 社区版不展示 -->
     <div class="section" data-hide-editions="community">
       <div class="section-header" onclick="toggleSection(this)">
         <span>📊</span><span class="section-title">流量配额 / 成本管控</span><span style="color:var(--text3);font-size:12px">▼</span>

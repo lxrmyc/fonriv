@@ -42,7 +42,7 @@
   /* 位置类型顺序与 TargetPicker 一致: 本机 / df挂载点 / 网络共享 / 已存服务器 / 远端存储 */
   var LOC_TABS_ALL = [['local','💻 本机'],['df','💽 df 挂载点'],['share','🌐 网络共享'],
                   ['server','🖥 已存服务器'],['cloud','☁ 远端存储']];
-  // v6.16.2 批18 · 社区版隐藏商业档来源 (df挂载点=企业档 disk / 远端存储=企业档 cloud); 网络共享保留社区
+  // v6.16.2 批18 · 社区版隐藏未随包来源 (df 挂载点=disk 键 / 远端存储=cloud 键); 网络共享保留
   var _isComm = (window.__licFeatEdition || 'community') === 'community';
   var LOC_TABS = _isComm
     ? LOC_TABS_ALL.filter(function(x){ return x[0] !== 'df' && x[0] !== 'cloud'; })

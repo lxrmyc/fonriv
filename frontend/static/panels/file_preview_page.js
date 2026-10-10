@@ -430,9 +430,10 @@
           '<span style="flex:0 0 44px;color:var(--text3);font-size:10px;text-align:right">'+ext2+'</span></div>';
       }
       if (_VIEW === 'gallery'){
+        /* v1.0.0 · FIX: 相册/缩略图不再丢普通文件; 也不把 ".." 当瓦片(点它会跳到上级, 看着像"只能进目录") */
+        if (e.name === '..' || e.name === '.') return '';
         var isImg = !isDir && _IMG_RE.test(e.name||'');
         var isAV = !isDir && _AV_RE.test(e.name||'');
-        if (!isDir && !isImg && !isAV) return '';
         return '<div '+base+' style="width:124px;padding:5px;border-radius:6px;cursor:pointer;display:flex;flex-direction:column;gap:3px;font-size:11px">'+
           (_thumbHtml(full, e.name) || ('<div style="width:100%;height:74px;border-radius:5px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:24px">'+(isDir?'📁':(isAV?'🎬':'📄'))+'</div>')) +
           '<span style="max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:'+(isDir?'var(--purple)':'var(--text)')+'">'+(isDir?'📁 ':'')+esc(e.name)+'</span></div>';
@@ -840,7 +841,7 @@
       });
       html += '</optgroup>';
     }
-    /* v1.0.0 · 社区版去掉「☁ 远端存储」组 (远端存储为商业能力, 社区档无入口) */
+    /* v1.0.0 · 社区版去掉「☁ 远端存储」组 (非社区能力, 社区版无入口) */
     sel.innerHTML = html;
     // v1.0.0 · 残留选择(df:/cloud:)在新列表里不存在 → 回落本机, 避免"显示本机却带着旧远端描述"
     if (ST.value && (/^df:/.test(String(ST.value)) || /^cloud:/.test(String(ST.value)))){

@@ -884,27 +884,34 @@ async def handle_rsync(ws, data: dict, task_id):
                                     except OSError:
                                         pass
                         # keep-newer: 不做隔离, rsync -u 较新者胜 + 记录在案
+                # v1.0.0 · FIX(实测: 双向同步报 "destination must be a directory when copying
+                #   more than 1 file" → rsync code 3): 旧实现在"← 本地"轮把**文件路径** src_path
+                #   直接当目标, 而远端目录里不止一个文件 → 目标必须是目录。
+                #   按源形态分派: 目录 → 两轮都按"目录内容"同步(尾斜杠); 文件 → 两轮都精确定位到该文件。
+                try:
+                    _src_is_dir = os.path.isdir(src_path)
+                except Exception:
+                    _src_is_dir = False
+                _bn_sync = "" if _src_is_dir else os.path.basename(src_path.rstrip("/"))
                 for phase, pdir in (("→ 远端", "up"), ("← 本地", "down")):
                     sflags = list(rsync_flags)
                     if "-u" not in sflags:
                         sflags.append("-u")  # --update: 较新者胜
                     # v4.51.0 · 关键: down 语义是 (远端路径, 本地路径), 而 sync 的
                     #   src=本地 dst=远端 → down 轮必须互换 src/dst 传参
-                    if pdir == "up":
-                        argv, _ = run.build_rsync_argv(pdir, src_path, dst_path, sflags)
-                    else:
-                        argv, _ = run.build_rsync_argv(pdir, dst_path, src_path, sflags)
+                    _up_src = (src_path.rstrip("/") + "/") if _src_is_dir else src_path
+                    _up_dst = dst_path.rstrip("/") + "/"
+                    _dn_dst = (src_path.rstrip("/") + "/") if _src_is_dir else src_path
+                    _dn_src = (dst_path.rstrip("/") + "/") if not _bn_sync else (dst_path.rstrip("/") + "/" + _bn_sync)
+                    _lg_src, _lg_dst = (_up_src, _up_dst) if pdir == "up" else (_dn_src, _dn_dst)
+                    argv, _ = run.build_rsync_argv(pdir, _lg_src, _lg_dst, sflags)
                     _first = f"[双向 {phase}] " + " ".join(argv)
                     log_buf.append(_first)
                     _lb.append(task_id, _first)
                     await ws.send_json({"type": "log", "level": "info", "msg": _first})
-                    # rsync_stream 同样按 down 语义互换 src/dst
-                    if pdir == "up":
-                        streamer = run.rsync_stream(pdir, src_path, dst_path,
-                                                    flags=sflags, task_id=task_id)
-                    else:
-                        streamer = run.rsync_stream(pdir, dst_path, src_path,
-                                                    flags=sflags, task_id=task_id)
+                    # rsync_stream 与 argv 用同一组路径(按源形态分派后)
+                    streamer = run.rsync_stream(pdir, _lg_src, _lg_dst,
+                                                flags=sflags, task_id=task_id)
                     async for line_str in streamer:
                         if line_str.startswith("__DONE__|"):
                             total_rc |= int(line_str.split("|", 1)[1])

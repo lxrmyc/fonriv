@@ -13,7 +13,7 @@
   // ---- 找到某 group 的 children（跟 switchGroup 权限过滤一致）----
   function visibleChildren(group){
     if (!group || !group.children) return null;
-    // v5.85.0 · 改用 app.js 的**单一真源**(含档位隐藏 + license 档位表 + 用户权限);
+    // v5.85.0 · 改用 app.js 的**单一真源**(含功能键隐藏 + 社区内置表 + 用户权限);
     //   此前这里只过滤用户权限 → 下拉里会列出别的版本才有的菜单(用户实测)
     var fn = window.navChildVisible;
     if (typeof fn === 'function') return group.children.filter(fn);

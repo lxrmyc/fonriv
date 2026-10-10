@@ -389,10 +389,13 @@
             + addBtn
             + '</div>';
         } else {
-          // v4.93.0 · A1 相册视图: 仅媒体文件网格 (本地缩略图/远端占位), 目录与其他文件弱化
+          /* v1.0.0 · FIX(用户实测"相册视图里文件丢失"): 原实现把**非媒体文件整个丢掉**
+             (continue) → 相册视图只剩目录和图片, 普通文件像"消失"了。
+             现在: 目录/图片/音视频/其他文件都出瓦片(其他用 📄); ".."(上级目录)不出瓦片,
+             避免用户点第一个瓦片被带到上级目录(上级用 ⬆ 按钮/面包屑)。 */
+          if (e.name === '..' || e.name === '.') continue;
           var isImg = !isDir && IMG_RE.test(e.name);
           var isAV = !isDir && /\.(mp4|mkv|webm|mov|mp3|flac|wav|m4a|ogg)$/i.test(e.name);
-          if (!isImg && !isAV && !isDir) continue;
           var gThumb = '';
           if (isImg){
             gThumb = '<div data-rp-thumb="'+_esc(p)+'" style="width:100%;height:78px;border-radius:5px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:26px">⏳</div>';

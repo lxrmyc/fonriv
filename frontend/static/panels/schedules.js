@@ -1362,7 +1362,7 @@
     }).join(' ');
   };
 
-  // v6.16.14 · 档位裁剪(用户要求: 非社区版功能清除): flow/dbbackup/云上传三类任务属
+  // v6.16.14 · 功能裁剪(非社区版功能清除): flow/dbbackup/云上传三类任务属
   //   enterprise/pro 能力, 未授权时不进下拉(此前社区版可直接选到, 属功能外溢)。
   var ACT_FEAT = { flow_scheduled:'flow', dbbackup_scheduled:'dbbackup', remote_upload_scheduled:'cloud' };
   Sched._actAllowed = function(k){

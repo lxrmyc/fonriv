@@ -878,10 +878,10 @@ def security_matrix() -> dict:
                          "(LL2 引擎就绪 + 决策层 + 执行层均已接入)")
 
     # ② 授权状态
-    # v1.0.0 · 社区版: 无远程授权/档位/到期概念 —— 安全板块只展示架构与权限矩阵,
-    #   这里给一个固定标识(原授权心跳/闸门/实例ID 字段已随商业件一并移除)
+    # v1.0.0 · 社区版: 无远程授权/到期概念 —— 安全板块只展示架构与权限矩阵,
+    #   这里给一个固定标识(原授权心跳/闸门/实例ID 字段与旧授权机制一并移除)
     lic = {"status": "community", "edition": "社区版 (开源 · AGPL-3.0)"}
-    # 功能键与档位
+    # 功能键清单
     feat = {"groups": 0, "editions": {}}
     try:
         import json as _j
@@ -944,7 +944,7 @@ def security_matrix() -> dict:
     except Exception as e:
         coverage["error"] = str(e)[:100]
 
-    # 档位 → 解锁页面映射 (NAV_TREE feat 键)
+    # 功能键 → 解锁页面映射 (NAV_TREE feat 键)
     edition_pages = []
     try:
         import re as _re3

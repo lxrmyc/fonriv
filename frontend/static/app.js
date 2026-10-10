@@ -2318,8 +2318,8 @@ function switchTab(t){
       return;
     }
   }
-  // v6.16.14 · 档位兜底(用户要求: 非社区版功能/显示一律清除): switchTab 是**所有面板入口的总闸**,
-  //   此前只校验用户权限不校验 license → 任何残留按钮(或控制台直调)都能打开 pro/enterprise 面板。
+  // v6.16.14 · 功能兜底(非社区版功能/显示一律清除): switchTab 是**所有面板入口的总闸**,
+  //   此前只校验用户权限不校验功能键 → 任何残留按钮(或控制台直调)都能打开未随包的面板。
   //   这里按 NAV_TREE 的 feat 键 + hideEditions 兜底拦截, 与导航显隐同源。
   try{
     var _nd = null;
@@ -2333,8 +2333,8 @@ function switchTab(t){
                         && !window.licenseFeatEnabled(_nd.feat));
       if (!_blocked && Array.isArray(_nd.hideEditions) && _nd.hideEditions.indexOf(_edn) >= 0) _blocked = true;
       if (_blocked){
-        if (typeof toastErr === 'function') toastErr('该功能不在当前授权档位内 (需升级授权)');
-        try { addLog('拒绝访问 '+t+'（档位不含该功能）','warn'); } catch(e){}
+        if (typeof toastErr === 'function') toastErr('该功能不在社区版内');
+        try { addLog('拒绝访问 '+t+'（社区版不含该功能）','warn'); } catch(e){}
         return;
       }
     }
@@ -2521,8 +2521,8 @@ function switchTab(t){
 }
 
 // v2.6.3: 按当前用户权限隐藏/显示 tab
-// v5.85.0 · 导航子项可见性**单一真源**: 档位隐藏(hideEditions) + license 白名单/档位表 + 用户权限。
-//   此前三个渲染路径各写一份过滤, 只有 switchGroup 那份带了档位判断 →
+// v5.85.0 · 导航子项可见性**单一真源**: 功能键隐藏(hideEditions) + 功能白名单/内置表 + 用户权限。
+//   此前三个渲染路径各写一份过滤, 只有 switchGroup 那份带了功能键判断 →
 //   于是「三角下拉」还会列出别的版本才有的菜单(用户实测)。
 function navChildVisible(c){
   if (!c) return false;
@@ -2563,7 +2563,7 @@ function applyPermissions(){
   // v4.44.1 · license 功能白名单显隐 (window.__licFeat 由 license_get 填充;
   //   null=未拉取/edition 不限 → 不隐藏; 数组=白名单硬控, 对 admin 同样生效)
   var lf = window.__licFeat;
-  // v5.83.0 · 按档位隐藏(声明式): 导航项/元素可标 hideEditions:['community'] 或 data-hide-editions="community,pro"
+  // v5.83.0 · 按功能键隐藏(声明式): 导航项/元素可标 hideEditions:['community'] 或 data-hide-editions="community,pro"
   var _edn = window.__licFeatEdition || 'community';
   function _ednHide(o){ return !!(o && Array.isArray(o.hideEditions) && o.hideEditions.indexOf(_edn) >= 0); }
   function _featOK(f){ return !f || !Array.isArray(lf) || lf.indexOf(f) >= 0; }
@@ -2626,8 +2626,8 @@ function applyPermissions(){
 
 // v4.45.0 · license 功能开关查询 (前端显隐判定用; 同步函数, 用缓存白名单)
 //   feat 未出现在白名单 = 未授权 -> false; 无白名单(=edition 全放行) -> true
-/* v1.0.0 · 档位判定(与导航显隐同源: RP_FEATURE_EDITIONS 的当前档功能表)。
-   社区档不含 cloud/cloudpool 等商业键 → 对应轮询/请求直接跳过(避免一堆"未知 action"噪音)。 */
+/* v1.0.0 · 功能键判定(与导航显隐同源: RP_FEATURE_EDITIONS 的社区内置功能表)。
+   社区版不含 cloud/cloudpool 等功能键 → 对应轮询/请求直接跳过(避免一堆"未知 action"噪音)。 */
 window.__featInEdition = function(feat){
   try {
     var ed = window.__licFeatEdition || 'community';
@@ -2696,7 +2696,7 @@ function fetchLicenseFeatures(){
     if(msg && msg.status === 'ok'){
       var lf = msg.features_allow;
       if (!Array.isArray(lf)){
-        // v5.81.7 · 无显式白名单(常见: 社区版/按档位授权) → 回退到**档位表**过滤,
+        // v5.81.7 · 无显式白名单(常见: 社区版) → 回退到**社区内置功能表**过滤,
         //   否则社区版导航会列出被锁功能(点了由后端拒绝, 体验上像坏了)。
         var _edMap = window.RP_FEATURE_EDITIONS || {};
         var _ed = msg.edition || 'community';
@@ -2706,8 +2706,8 @@ function fetchLicenseFeatures(){
       window.__licFeatEdition = msg.edition || null;  // v4.45.0 · 缓存 edition
       applyLicenseBranding(window.__licFeatEdition);  // v4.45.0 · 版本/版名联动
       if(typeof applyPermissions === 'function') applyPermissions();
-      /* v6.16.17 · 白名单/档位晚于首屏 → 左栏快捷操作按真实档位重渲染一次
-         (首屏 __licFeat=null 时按 community 档位表兜底, 商业档用户的按钮在此补回) */
+      /* v6.16.17 · 白名单晚于首屏 → 左栏快捷操作按真实功能表重渲染一次
+         (首屏 __licFeat=null 时按社区功能表兜底) */
       try { if (window.UIPrefs && window.UIPrefs.renderQuickList) window.UIPrefs.renderQuickList(); } catch(e){}
     }
   });
@@ -3588,12 +3588,7 @@ async function testConnection(){
 // ------------------------------------------
 function startTransfer(){
   if(transferRunning) return;
-  // v5.10.0 · 授权闸门: 授权失效且宽限期已过 → 阻止新传输 (由服务端 license state 判定)
-  if (window._licenseBlocked){
-    if(typeof addLog === 'function') addLog('🚫 授权已失效: ' + (window._licenseBlockReason || '请重新激活'), 'error');
-    if(typeof toastErr === 'function') toastErr('授权已失效, 无法开始传输');
-    return;
-  }
+  /* v1.0.0 · 社区版无授权闸门(原 window._licenseBlocked 判断已移除) */
   // v4.38.21 · 优先使用三列组件的传输项列表
   var items = (window.TriPaneTransfer && typeof window.TriPaneTransfer.getItems === 'function')
     ? window.TriPaneTransfer.getItems() : null;
@@ -3626,11 +3621,20 @@ function _resolveCredsForItems(items){
     }
     return s;
   }
-  (items || []).forEach(function(it){
-    var sid = it && it.server;
-    if (!sid || sid === 'local' || sid === 'l' || (typeof sid === 'string' && (sid.indexOf('cld_') === 0 || sid.indexOf('shs_') === 0 || sid.indexOf('dfm_') === 0))) return;
+  function _skipSid(sid){
+    return (!sid || sid === 'local' || sid === 'l'
+            || (typeof sid === 'string' && (sid.indexOf('cld_') === 0 || sid.indexOf('shs_') === 0 || sid.indexOf('dfm_') === 0)));
+  }
+  /* v1.0.0 · 逐栏解析: 一个传输项可能涉及**两台**远端(远端→远端), 两侧凭据都要备好,
+     并把最终 auth 挂到 item._authOf.src / item._authOf.dst, 供 _startTransferMulti 直接用。 */
+  function _prepSide(it, sid, side){
+    if (_skipSid(sid)) return;
     var srv = srvOf(sid);
     if (!srv || !srv.host) return;
+    it._authOf = it._authOf || {};
+    it._authOf[side] = { host: srv.host, port: String(srv.port || '22'), user: srv.user || 'root',
+                         auth_type: srv.auth_type || 'pass', password: srv.password || '',
+                         key: srv.key || '', passphrase: srv.passphrase || '' };
     if (srv.password || srv.key) return;            // 已有凭据(表单/缓存) 不必解析
     var key = srv.host + ':' + (srv.port || 22);
     if (jobs[key]) return;
@@ -3641,9 +3645,20 @@ function _resolveCredsForItems(items){
         srv.key = rr.creds.key || '';
         srv.passphrase = rr.creds.passphrase || '';
         srv._credResolved = true;
+        it._authOf[side] = { host: srv.host, port: String(srv.port || '22'), user: srv.user || 'root',
+                             auth_type: srv.auth_type, password: srv.password, key: srv.key,
+                             passphrase: srv.passphrase };
       }
       return rr;
     }).catch(function(){});
+  }
+  (items || []).forEach(function(it){
+    if (!it) return;
+    var sid = it.server;
+    _prepSide(it, it.srcSrv || (it.mode === 'pull' ? sid : null), 'src');
+    _prepSide(it, it.dstSrv || (it.mode === 'pull' ? null : sid), 'dst');
+    // 兼容: 两侧都算不出来时退回旧字段
+    if (!it._authOf || (!it._authOf.src && !it._authOf.dst)) _prepSide(it, sid, 'dst');
   });
   var list = Object.keys(jobs).map(function(k){ return jobs[k]; });
   return list.length ? Promise.all(list) : Promise.resolve();
@@ -3696,53 +3711,59 @@ function _startTransferMulti(items){
       });
       return;
     }
-    // 从 item 取 server -> 在 _servers 中找 auth
+    /* ══ v1.0.0 · 方向与主机判定重做 ══
+       后端只认 direction ∈ up/down/cross/local/sync; 旧代码发的是 item.mode(push/pull)
+       → "pull" 不被识别被当 up 执行, 于是"远端→本地/远端→远端"必败(rsync 退出码 23)。
+       新口径(与后端 direction 契约一致): 由**两侧**推导方向 ——
+         local→remote=up · remote→local=down · remote→remote=cross · local→local=local · mode=sync→sync */
     var auth = getTransferAuth();
     var host = gv('srvHost'), port = gv('srvPort'), user = gv('srvUser');
-    if (item.server && item.server !== 'local'){
-      var srv = null;
-      if (window.ServersAPI){
-        try { srv = window.ServersAPI.getById(item.server); } catch(e){}
-      }
-      if (!srv && window.ServersStore){
-        try { srv = window.ServersStore.get(item.server); } catch(e){}
-      }
-      if (!srv){
-        // 兜底：从 TriPaneTransfer._items 邻域查找（私有）
-        var all = (window.TriPaneTransfer && window.TriPaneTransfer._items) ? window.TriPaneTransfer._items() : [];
-        for (var i=0;i<all.length;i++){
-          if (all[i].server === item.server){ /* not enough info */ break; }
+    var _isLocalSid = function(sid){
+      return (!sid || sid === 'local' || sid === 'l'
+              || (typeof sid === 'string' && (sid.indexOf('cld_') === 0 || sid.indexOf('shs_') === 0 || sid.indexOf('dfm_') === 0)));
+    };
+    var _srcSid = item.srcSrv || (item.mode === 'pull' ? item.server : 'local');
+    var _dstSid = item.dstSrv || (item.mode === 'pull' ? 'local' : item.server);
+    var _srcLocal = _isLocalSid(_srcSid), _dstLocal = _isLocalSid(_dstSid);
+    var _sendDirection = (item.mode === 'sync') ? 'sync'
+        : (_srcLocal && _dstLocal) ? 'local'
+        : (!_srcLocal && !_dstLocal) ? 'cross'
+        : (_srcLocal ? 'up' : 'down');
+    // 首跳主机: up 用目标侧; down/cross 用源侧(down 从源机拉, cross 在源机上执行 rsync)
+    var _hop = ((_sendDirection === 'down' || _sendDirection === 'cross') ? item._authOf && item._authOf.src
+                : item._authOf && item._authOf.dst) || null;
+    if (_hop && _hop.host){
+      host = _hop.host; port = _hop.port || port || '22'; user = _hop.user || user;
+      auth = { auth_type: _hop.auth_type || 'pass', password: _hop.password || '',
+               key: _hop.key || '', passphrase: _hop.passphrase || '' };
+    }
+    // 兜底: 仍无凭据 → SP 缓存
+    if ((!auth.password && !auth.key) && host && window.SP && typeof window.SP.cachedCreds === 'function'){
+      try {
+        var _cc = window.SP.cachedCreds(host, port || '22');
+        if (_cc && (_cc.password || _cc.key)){
+          auth = { auth_type: _cc.auth_type || auth.auth_type,
+                   password: _cc.password || '', key: _cc.key || '', passphrase: _cc.passphrase || '' };
         }
-        // 实际：再尝试 fetch 服务器列表缓存
-        if (window.__serversCache){
-          for (var j=0;j<window.__serversCache.length;j++){
-            var s = window.__serversCache[j];
-            // v4.41.1 · 宽松比较: item.server 可能是数字 id 或持久化后的字符串 id
-            if (String(s.id||s.uuid) === String(item.server)){ srv = s; break; }
-          }
-        }
+      } catch(e){}
+    }
+    // 跨机: 后端要求 dst 写成 user@目标主机:/路径(它在源机上执行 rsync, 走 relay 两段式中转)
+    var _dstSend = item.dst;
+    var _dstHop = item._authOf && item._authOf.dst;
+    if (_sendDirection === 'cross'){
+      if (!_dstHop || !_dstHop.host){
+        addLogLine(logEl, '✗ 项 ' + (idx+1) + ' 跨机目标主机未知, 跳过(请确认右侧栏已连上目标服务器)', 'error');
+        errCount++; done++;
+        if (done === items.length) _finishMulti(done, okCount, errCount);
+        return;
       }
-      if (srv){
-        host = srv.host || host;
-        port = srv.port || port;
-        user = srv.user || user;
-        auth = {
-          auth_type: srv.auth_type || 'pass',
-          password: srv.password || '',
-          key: srv.key || '',
-          passphrase: srv.passphrase || '',
-        };
+      var _dPath = item.dst || '/';
+      if (item._isDir){
+        // v1.0.0 · 目录源: 目标拼上目录名 —— relay 两段式中转是"推目录内容", 不拼就会摊平
+        var _bnc = String(item.src || '').replace(/\/+$/, '').split('/').filter(Boolean).pop() || '';
+        if (_bnc) _dPath = _dPath.replace(/\/+$/, '') + '/' + _bnc;
       }
-      // v1.0.0 · 兜底: 条目仍无凭据 → 直接读 SP 缓存(由 _resolveCredsForItems / 浏览栏预热)
-      if (!auth.password && !auth.key && host && window.SP && typeof window.SP.cachedCreds === 'function'){
-        try {
-          var _cc = window.SP.cachedCreds(host, port || '22');
-          if (_cc && (_cc.password || _cc.key)){
-            auth = { auth_type: _cc.auth_type || auth.auth_type,
-                     password: _cc.password || '', key: _cc.key || '', passphrase: _cc.passphrase || '' };
-          }
-        } catch(e){}
-      }
+      _dstSend = (_dstHop.user || 'root') + '@' + _dstHop.host + ':' + _dPath;
     }
     if (!item.dst){
       addLogLine(logEl, '✗ 项 ' + (idx+1) + ' [' + item.src + '] 缺少 dst，跳过', 'error');
@@ -3757,26 +3778,20 @@ function _startTransferMulti(items){
       return;
     }
     addLogLine(logEl, '▶ [' + (idx+1) + '/' + items.length + '] ' + item.src + ' -> ' + item.dst + ' (server=' + (item.server||'local') + ')', 'info');
-    // v4.38.41 · 本地到本地 (server=local 且 host 空/127.0.0.1) -> direction='local', 不走 SSH
-    //   避免 rsync src root@127.0.0.1:dst 触发 ssh_askpass (空密码交互式输入失败)
-    // v4.40.0 · 共享挂载点 (server=shs_<uuid>) 在本机 -> 强制 direction='local' (src/dst 均为本机路径)
-    //   df 挂载点 (dfm_) 借 DM 主机凭据 SSH 浏览 -> host 非本机时保持 push/pull
-    var _srvIsShare = (typeof item.server === 'string' && item.server.indexOf('shs_') === 0);
-    var _isLocalItem = (!item.server || item.server === 'local' || item.server === 'l'
-                        || _srvIsShare
-                        || (typeof item.server === 'string' && item.server.indexOf('dfm_') === 0));
-    var _hostEmptyOrLocal = (!host || host === '127.0.0.1' || host === 'localhost');
-    var _sendDirection = (_isLocalItem && (_hostEmptyOrLocal || _srvIsShare)) ? 'local' : (item.mode || 'push');
     openWs(function(ws){
       _rpSendWhenReady(ws, {
         action: 'rsync',
         direction: _sendDirection,
         host: host, port: port, user: user,
-        src: item.src, dst: item.dst,
+        src: item.src, dst: _dstSend,
         flags: Array.from(activeFlags),
         bwlimit: gv('bwLimit')||'0',
         exclude: gv('excludePat')||'',
         auth_type: auth.auth_type, password: auth.password, key: auth.key, passphrase: auth.passphrase,
+        /* v1.0.0 · 跨机(cross): 目标端凭据(relay 第二段) —— 未单独提供时后端回退用源端同密码 */
+        dst_user: (_sendDirection === 'cross' && _dstHop) ? (_dstHop.user || 'root') : undefined,
+        dst_port: (_sendDirection === 'cross' && _dstHop) ? (_dstHop.port || '22') : undefined,
+        dst_password: (_sendDirection === 'cross' && _dstHop) ? (_dstHop.password || '') : undefined,
         auth_token: localStorage.getItem('auth_token') || ''
       }, undefined, function(){ try { console.warn('[ws] 发送失败'); } catch(_){} })
       var handler = function(e){
@@ -5974,7 +5989,7 @@ window.NAV_TREE = [
   ]},
 
   { key: 'remote_ops', label: '🖥 远程运维', children: [
-      { key: 'rdp_console',  label: '🖥 远程桌面 (RDP)', feat: 'rdp' },   // v5.83.0: 归商业键(社区版不再出现)
+      { key: 'rdp_console',  label: '🖥 远程桌面 (RDP)', feat: 'rdp' },   // v5.83.0: 非社区功能(社区版不出现)
       { key: 'vnc_direct',   label: '🖥 VNC 直链 (Linux)', feat: 'rsync' },
       { key: 'pve_console',  label: '🦠 PVE 虚拟控制台',   feat: 'pve_console' },  // v6.16.2 批20: 独立键(pro), 社区版隐藏
       { key: 'terminal',     label: '⌨ Web 终端 (SSH)',  feat: 'terminal' },
@@ -5982,7 +5997,7 @@ window.NAV_TREE = [
 
   { key: 'backup_g',   label: '🗄 备份中心', children: [
       { key: 'backup_center',   label: '🗄 备份总览',      feat: null },
-      { key: 'disk_image',      label: '💽 磁盘镜像备份',  feat: 'disk' },  // v6.16.2 批18: 挂 disk 键(企业档), 社区版不再出现
+      { key: 'disk_image',      label: '💽 磁盘镜像备份',  feat: 'disk' },  // 非社区功能键(社区版不出现)
       { key: 'proxmox',         label: '🖥 PVE 节点连接',  feat: 'pve' },
       { key: 'vzdump',          label: '📦 vzdump 打包',   feat: 'vzdump' },
       { key: 'pbs',             label: '📦 PBS 备份',      feat: 'pbs' },
@@ -6013,7 +6028,7 @@ window.NAV_TREE = [
       { key: 'users',       label: '👥 用户管理',     feat: null },
       { key: 'security',    label: '🛡 安全中心',     feat: null },
       { key: 'sysconf',     label: '💾 系统配置备份', feat: null },
-      { key: 'airgap',      label: '✈ Air-Gap 摆渡', feat: 'airgap' },  // v6.16.2 批18: 挂独立键(企业档), 社区版不再出现
+      { key: 'airgap',      label: '✈ Air-Gap 摆渡', feat: 'airgap' },  // 非社区功能键(社区版不出现)
       { key: 'downloads',   label: '💾 本地下载',     feat: null },
   ]},
 ];
@@ -6258,7 +6273,7 @@ function __applyLicenseSubTabs(){
   });
 }
 
-// v5.83.0 · 声明式档位隐藏: 带 data-hide-editions="community,pro" 的元素在对应档位隐藏(如安全中心的
+// v5.83.0 · 声明式功能键隐藏: 带 data-hide-editions="community,pro" 的元素在社区版隐藏(如安全中心的
 //   部分区块、系统设置里的任务注册表、侧栏自定义快捷操作在新版社区版不提供)
 function applyEditionHides(){
   var edn = window.__licFeatEdition || 'community';

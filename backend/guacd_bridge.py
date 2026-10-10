@@ -714,7 +714,7 @@ def recording_delete(name: str) -> dict:
 
 
 def _recording_params(q: dict) -> dict:
-    """会话录制(专业档能力): guacd 服务端录制 (.guac, guacenc 可转视频)。
+    """会话录制: guacd 服务端录制 (.guac, guacenc 可转视频)。
 
     与浏览器 MediaRecorder 录制互补 —— 服务端录制不经浏览器, 更像"取证记录"。
     """

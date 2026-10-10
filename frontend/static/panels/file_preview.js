@@ -398,8 +398,11 @@
         return String(a.name).localeCompare(String(b.name));
       });
       if (vm === 'thumb'){
-        var media = sorted.filter(function(e){ return e.type === 'dir' || _DIR_IMG_RE.test(e.name || '') || /\.(mp4|mkv|webm|mp3|flac|wav)$/i.test(e.name || ''); });
-        if (!media.length){ dbody.innerHTML = '<span style="color:var(--text3)">本目录没有可预览的图片/音视频, 请切到列表视图</span>'; return; }
+        /* v1.0.0 · FIX(用户实测"点缩略图后文件丢失"): 原实现只保留 目录+图片+音视频,
+           普通文件被过滤掉 → 缩略图里"看不见文件"。现在保留全部条目(普通文件用 📄),
+           并去掉 ".."(上级目录) 瓦片, 避免点第一个瓦片误跳上级。 */
+        var media = sorted.filter(function(e){ return e.name !== '..' && e.name !== '.'; });
+        if (!media.length){ dbody.innerHTML = '<span style="color:var(--text3)">本目录为空, 请切到列表视图</span>'; return; }
         dbody.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:10px">' + media.map(function(e, i){
           var p = e.path || (opts.path.replace(/\/$/, '') + '/' + e.name);
           var isD = e.type === 'dir';

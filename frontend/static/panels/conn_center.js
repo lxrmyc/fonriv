@@ -396,7 +396,7 @@ function closeModal(ov){
 /* ═══ 筛选 chips ═══ */
 const PROTO_CHIPS_ALL = [['ssh','SSH'],['pve_api','PVE'],['rdp','RDP'],['vnc','VNC'],
                      ['docker','DOCKER'],['truenas','NAS'],['remote_storage','S3'],['database','DB'],['pbs','PBS']];
-/* v6.16.14 · 档位裁剪: NAS(TrueNAS/cloud)/S3(cloud)/DB(dbbackup)/PBS(pbs) 属商业键 → 未授权不显示筛选片 */
+/* 功能裁剪: NAS(TrueNAS)/S3/DB/PBS 属非社区功能键 → 社区版不显示筛选片 */
 const PROTO_CHIP_FEAT = { truenas:'cloud', remote_storage:'cloud', database:'dbbackup', pbs:'pbs' };
 const PROTO_CHIPS = PROTO_CHIPS_ALL.filter(function(c){
   var f = PROTO_CHIP_FEAT[c[0]];
@@ -1200,7 +1200,7 @@ function editorOpenWith(profile){
   _edGuid = profile.guid||'';
   _edProfile = profile;   // v5.90.2 · 供 renderField 分栏判定
   const proto = profile.protocols||{};
-  /* v6.16.2 批23 · 编辑器字段按档位隐藏: 高版本能力块(功能闸未放行)不出现在表单里
+  /* v6.16.2 批23 · 编辑器字段按功能键隐藏: 非社区能力块(功能闸未放行)不出现在表单里
      (用户明令: 编辑服务器里还有好几个高版本功能没隐藏) —— 一次性计算可见页签, 头/体同步 */
   const BLOCK_FEAT = { pbs:'pbs', lvm:'lvm', zfs:'zfs', rbd:'rbd',
                        database:'dbbackup', truenas:'cloud', remote_storage:'cloud' };

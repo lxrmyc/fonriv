@@ -50,8 +50,8 @@ try:
     from backend.handlers.vnc_rec import (
         handle_vnc_rec_list, handle_vnc_rec_delete,
         handle_recording_list, handle_recording_convert, handle_recording_delete,
-    )  # v5.23.0 · 会话录制 (旗舰档)
-except ImportError:  # 旗舰包外(社区/专业)该文件已剪除 → 相关路由一律不注册
+    )  # 会话录制(本发行包不含该模块)
+except ImportError:  # 该模块不在本发行包时 → 相关路由一律不注册
     handle_vnc_rec_list = handle_vnc_rec_delete = None
     handle_recording_list = handle_recording_convert = handle_recording_delete = None
 try:
@@ -70,14 +70,14 @@ from backend.handlers.server_profile import (  # v5.33.0 · 统一服务器档�
     handle_sp_resolve,                       # v5.34.3 · P3 跨页凭据解析
     handle_cred_list, handle_cred_save, handle_cred_del,   # v5.34.6 · P6 凭据保险库
     handle_sp_wol,                                       # v5.34.6 · P6 Wake-on-LAN
-    # v6.16.14 · 会话录制三动作已迁至 handlers/vnc_rec.py(随档位剪除), 不再从本模块导入
+    # v6.16.14 · 会话录制三动作已迁至 handlers/vnc_rec.py(本发行包不含该模块), 不再从本模块导入
 )
 from backend.handlers.conn_center import (   # v5.32.0 · 连接中心
     handle_conn_open, handle_conn_close, handle_conn_list, handle_conn_renew,
 )
 
 try:
-    from backend.handlers.fonrvfs import (   # v5.40.0 · FonrVFS 多云文件管理 (专业/旗舰档能力, 社区版不随包)
+    from backend.handlers.fonrvfs import (   # v5.40.0 · FonrVFS 多云文件管理(本发行包不含该模块)
         handle_fonr_storages, handle_fonr_caps, handle_fonr_list, handle_fonr_stat,
         handle_fonr_preview_meta, handle_fonr_read_text, handle_fonr_read_hex,
         handle_fonr_mkdir, handle_fonr_mkfile, handle_fonr_attrs, handle_fonr_delete, handle_fonr_rename, handle_fonr_copy,
@@ -162,7 +162,7 @@ from backend.handlers.pve import (
     handle_pve_restore,
 )
 # ---------------------------------------------------------------------------
-# v4.48.0 P5 · 企业专属模块条件导入 (两版本构建管线)
+# 非社区模块条件导入(模块不在本发行包时整体跳过)
 #   pro 发行包会物理剔除 enterprise 专属 handler (features.json prune 清单)，
 #   这里 try/except 保证剔除后 ws.py 仍可加载 —— 完整版全部导入成功，零行为差异。
 #   注: handlers/vzdump.py 混有通用 kill/get_logs/clear_logs，不可剪枝。
@@ -419,7 +419,7 @@ try:
         handle_pv_backup,
         handle_backup_verify_sha256,
     )
-except ImportError:  # v6.16.20 批37 · 社区包: k8s_backup 剪除 (专业档)
+except ImportError:  # 本发行包不含 k8s_backup 模块
     handle_etcd_snapshot = handle_docker_backup = handle_pv_backup = None
     handle_backup_verify_sha256 = None
 try:
@@ -431,7 +431,7 @@ try:
         handle_ai_draft_issue,   # v5.57.0 D1 · 沙盒草稿令牌
         handle_ai_intent_list,   # v5.57.0 D3 · 意图审计
     )
-except ImportError:  # v6.16.20 批37 · 社区包: ai_assistant 剪除 (专业档)
+except ImportError:  # 本发行包不含 ai_assistant 模块
     handle_ai_config_get = handle_ai_config_set = handle_ai_chat = None
     handle_ai_execute = handle_ai_draft_issue = handle_ai_intent_list = None
 from backend.handlers.file_ops import (  # v4.58.0 · 文件查看/编辑/管理
@@ -475,7 +475,7 @@ try:
         handle_restic_forget,
         handle_restic_stats,
     )
-except ImportError:  # v6.16.20 批37 · 社区包: restic 剪除 (专业档)
+except ImportError:  # 本发行包不含 restic 模块
     handle_restic_check = handle_restic_init = handle_restic_backup = None
     handle_restic_snapshots = handle_restic_ls = handle_restic_restore = None
     handle_restic_forget = handle_restic_stats = None
@@ -488,7 +488,7 @@ try:
         handle_drill_run,
         handle_drill_history,
     )
-except ImportError:  # v6.16.20 批37 · 社区包: worm_drill 剪除 (专业档)
+except ImportError:  # 本发行包不含 worm_drill 模块
     handle_worm_config = handle_worm_apply = handle_worm_release = None
     handle_worm_status = handle_drill_run = handle_drill_history = None
 from backend.engine_selector import handle_engine_analyze  # v4.82.0 · 专利1
@@ -529,7 +529,7 @@ try:
         handle_ferry_pubkey,   # v5.14.0 · RSA 公钥带外分发
         handle_ferry_trust,
     )
-except ImportError:  # v6.16.22 批39 · 社区/专业包: airgap 随企业档键剪除
+except ImportError:  # 本发行包不含 airgap 模块
     handle_ferry_export = handle_ferry_import = handle_ferry_list = None
     handle_ferry_pubkey = handle_ferry_trust = None
 from backend.quota import (  # v4.91.0 · F4 流量配额/成本管控
@@ -606,7 +606,7 @@ try:
         handle_dbb_delete,
         handle_dbb_drill,
     )
-except ImportError:  # v6.16.20 批37 · 社区包: dbb 剪除 (专业档; rest_api 引用点已加护栏)
+except ImportError:  # 本发行包不含 dbb 模块(引用点已加护栏)
     handle_dbb_check = handle_dbb_scan = handle_dbb_backup = None
     handle_dbb_list = handle_dbb_verify = handle_dbb_restore = None
     handle_dbb_delete = handle_dbb_drill = None
@@ -638,7 +638,7 @@ try:
         handle_watch_events,
         handle_watch_test_run,
     )
-except ImportError:  # v6.16.20 批37 · 社区包: watch 剪除 (专业档)
+except ImportError:  # 本发行包不含 watch 模块
     handle_watch_rule_list = handle_watch_rule_save = handle_watch_rule_delete = None
     handle_watch_rule_toggle = handle_watch_status = None
     handle_watch_events = handle_watch_test_run = None
@@ -649,7 +649,7 @@ try:
         handle_dbbackup_list,
         handle_dbbackup_scan_databases,  # v4.55.0 · 扫描库列表
     )
-except ImportError:  # v6.16.20 批37 · 社区包: dbbackup 剪除 (专业档; scheduler 引用点已加护栏)
+except ImportError:  # 本发行包不含 dbbackup 模块(引用点已加护栏)
     handle_dbbackup_run = handle_dbbackup_check = handle_dbbackup_list = None
     handle_dbbackup_scan_databases = None
 from backend.handlers.share import (  # v4.39.0 Phase 2a · 网络共享 SMB/NFS/AFP/WebDAV
@@ -1282,7 +1282,7 @@ ACTION_DESC_MAP = {
 #   admin 豁免; 不在表内 = 不做用户级拦截)
 # v4.46.0 P1 · 功能闸映射改由 scripts/features.json 单一真源生成
 #   (backend/features_gen.py · gen_features.py 产出), 修 P0-1: vzdump 4 个
-#   action 此前错挂 pve 键 → pro 可 WS 直连绕过旗舰闸。
+#   action 此前错挂 pve 键 → 可被 WS 直连绕过功能闸。
 # ---------------------------------------------------------------------------
 # v5.62.0 · E3 边缘传输引擎(zstd+rsync / mc 并发镜像)
 # v5.65.0 · F1 传送门(Ctrl+G): 全局快速跳转 —— 数据汇总/模糊排序
@@ -1321,7 +1321,7 @@ except ImportError:
 try:
     from backend import edition_gate as _edition_gate
 except ImportError as _eg_err:  # noqa: F811
-    raise SystemExit("[FATAL] 档位闸模块缺失 (backend/edition_gate 或 edition_gate.abi3.so) — "
+    raise SystemExit("[FATAL] 功能闸模块缺失 (backend/edition_gate.py) — "
                      "拒绝以无闸形态启动: %r" % (_eg_err,))
 ACTION_FEATURE_MAP = _edition_gate.GATE_MAP  # noqa: E402 · 兼容既有引用点(闸检查/契约守栏)
 
@@ -1331,7 +1331,7 @@ for _a in ("rsync", "test_conn", "scan_storage", "list_dir", "list_remote_dir",
     ):
     ACTION_PAGE_MAP[_a] = "transfer"
 # v6.16.11 · test_conn 同时服务「文件传输」与「Web 终端」两页的连接测试
-#   (终端测试按钮此前借 disk_scan → 社区版撞企业档授权闸, 已改挂 test_conn);
+#   (终端测试按钮此前借 disk_scan → 社区版会被能力闸拦下, 已改挂 test_conn);
 #   页闸取并集: 有 transfer 或 terminal 任一权限即可用。
 ACTION_PAGE_MAP["test_conn"] = ("transfer", "terminal")
 for _a in ("disk_scan", "disk_plugin_check", "disk_mount_ro", "disk_unmount", "disk_df",
@@ -1951,8 +1951,8 @@ ROUTE_NO_TASK = {
     "share_plugin_check": handle_share_plugin_check,
 }
 
-# 长任务路由 (基础条目; storage 企业条目已在上方条件 update)
-# v6.16.14 · 会话录制路由(旗舰档; handler 被剪时不注册)
+# 长任务路由 (基础条目; storage 条目在上方条件 update)
+# 会话录制路由(模块不在本发行包时不注册)
 if handle_vnc_rec_list:
     ROUTE_NO_TASK.update({
         "vnc_rec_list":      handle_vnc_rec_list,
@@ -2013,7 +2013,7 @@ ROUTE_TASK = {
     "conn_open":          handle_conn_open,
 }
 
-# v4.48.0 P5 · 企业专属模块条件注册 (pro 包剔除文件后这些块整体跳过)
+# 非社区模块条件注册 (模块不在本发行包时这些块整体跳过)
 # storage (lvm/zfs/pbs/rbd)
 if handle_test_lvm:
     ROUTE_NO_TASK.update({
@@ -2612,7 +2612,7 @@ async def websocket_endpoint(ws: WebSocket):
             if action != "license_get":  # 查询自身豁免 (前端登录后要靠它做显隐)
                 _feat = ACTION_FEATURE_MAP.get(action)
                 # v1.0.0 · 社区版功能闸: 非社区键(pro/enterprise)一律拒绝, 文案指向社区版内置能力
-                #   (原"完整性降级/反调试降级/请联系厂商"分支已随商业授权件移除)
+                #   (原"完整性降级/反调试降级/请联系厂商"分支已随旧授权机制移除)
                 if _feat and not lic.feature_enabled(_feat):
                     await ws.send_json({"type": "result", "status": "error",
                                         "req_id": data.get("req_id", ""),

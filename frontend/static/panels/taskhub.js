@@ -63,7 +63,7 @@
     if (jobs == null && runs == null && !force) {
       b.innerHTML = st()({ state: 'loading', msg: '正在读取任务…' });
     }
-    /* v6.16.14 · 档位裁剪: 后台作业(fonrvfs)/流程运行(flow) 属商业键, 未授权时不请求不显示 */
+    /* 功能裁剪: 后台作业(fonrvfs)/流程运行(flow) 属非社区功能键, 社区版不请求不显示 */
     var _lic = function(f){ return !(typeof window.licenseFeatEnabled === 'function' && !window.licenseFeatEnabled(f)); };
     if (!_lic('fonrvfs')) ERR.jobs = '__HIDE__';
     if (!_lic('flow')) ERR.runs = '__HIDE__';

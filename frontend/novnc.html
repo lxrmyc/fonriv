@@ -221,7 +221,7 @@ if (MODE === 'raw'){
 }
 window.addEventListener('resize', () => { fit(); });
 
-// ═══ v5.23.0 · 会话录制 (vnc_record, 专业档能力): MediaRecorder 录 noVNC 画布 → webm 上传 ═══
+// ═══ v5.23.0 · 会话录制 (vnc_record, 本发行包不含该模块): MediaRecorder 录 noVNC 画布 → webm 上传 ═══
 let mediaRec = null, recChunks = [], recTimer = null, recStart = 0;
 
 function recSupported(){ return 'MediaRecorder' in window && HTMLCanvasElement.prototype.captureStream; }
