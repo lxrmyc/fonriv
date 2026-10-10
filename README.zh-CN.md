@@ -4,9 +4,9 @@
 
 **源流多云传输与备份管理平台** · V1.0
 
-社区版永久免费，面向个人服务器、Homelab 与学习场景。
+社区版以 AGPL-3.0 开源发布，永久免费，面向个人服务器、Homelab 与学习场景。
 
-[官网](https://www.fonriv.com) · [English](README.md) · [下载](https://www.fonriv.com)
+[官网](https://www.fonriv.com) · [English](README.md) · [Releases 下载](../../releases)
 
 </div>
 
@@ -28,7 +28,7 @@
 
 | 领域 | 能力 |
 |---|---|
-| 服务器档案与连接中心 | 多层分组、凭据加密存储、连接状态可视化（≤ **8** 台档案，≤ **3** 用户） |
+| 服务器档案与连接中心 | 多层分组、凭据加密存储、连接状态可视化 —— **档案数与用户数不限** |
 | 文件传输 | 基于 rsync 的上传 / 下载 / 双向同步 / 断点续传 / 并行分片（万级小文件优化） |
 | 网络共享 | SMB / NFS 网络共享挂载与管理 |
 | Web 终端 | 浏览器内完整 SSH 终端 |
@@ -39,7 +39,7 @@
 | 远程控制台 | 浏览器内 RDP / VNC 远程桌面（guacd 网关 —— 在内置「依赖」面板一键安装即可） |
 | 告警通知 | Webhook / 邮件 |
 | QoS | 分时段带宽限速 |
-| 在线更新 | 内置更新器对接官方通道（`https://www.fonriv.com/update`），sha256 强制校验 |
+| 在线更新 | 内置更新器对接 **GitHub Releases**（也支持自建静态目录），sha256 强制校验 |
 | 界面语言 | 简体中文 / English |
 
 ## 环境要求
@@ -50,12 +50,12 @@
 
 ## 快速开始
 
-### 方式一：tar.gz + 一键脚本
+### 方式一：tar.gz + 一键脚本（压缩包内即完整源码）
 
 ```bash
 # 1. 解包
 sudo mkdir -p /opt/fonriv
-sudo tar xzf fonriv_community_v1.0.0.tar.gz -C /opt/fonriv
+sudo tar xzf fonriv-community-v1.0.0-linux-amd64.tar.gz -C /opt/fonriv
 cd /opt/fonriv
 
 # 2. 一键安装（自动建 venv、写 systemd 单元并启动服务）
@@ -68,8 +68,8 @@ sudo bash scripts/install.sh --yes
 ### 方式二：deb 包（Debian 12 / Ubuntu 22.04+）
 
 ```bash
-sudo apt-get install -y ./fonriv_1.0.0_amd64.deb
-# 安装到 /opt/fonriv，数据在 /var/lib/fonriv，内置离线 Python 轮子，内网可装
+sudo apt-get install -y ./fonriv-community_1.0.0_amd64.deb
+# 安装到 /opt/fonriv，数据在 /opt/fonriv/data，内置离线 Python 轮子，内网可装
 ```
 
 服务管理：
@@ -84,20 +84,14 @@ journalctl -u fonriv -f
 
 ## 在线更新
 
-「关于 → 检查更新」自动对接官方通道（默认 `https://www.fonriv.com/update`）。每个升级包都经 sha256 强制校验，校验不通过自动拒绝应用。
+「关于 → 检查更新」默认对接 **GitHub Releases**（弹窗里也可改为自建静态目录）。每个升级包都经 sha256 强制校验，校验不通过自动拒绝应用。
 
-## 版本对比
+## 开源版能力边界
 
-| | 社区版 | 专业版 | 旗舰版 |
-|---|---|---|---|
-| 价格 | **永久免费** | [详情咨询官网](https://www.fonriv.com) | [详情咨询官网](https://www.fonriv.com) |
-| 定位 | 个人 / Homelab | 小团队 / 高级用户 | 中大型企业 |
-| 服务器档案 / 用户数 | 8 / 3 | 60 / 20 | 不限 |
-| 额外能力 | — | 分享管理（局域网分享向导 / HTTP 链接 / SMB 账号与权限）、多云文件管理 FonrVFS、AI 助手、restic 去重备份、实时同步守护、K8s 备份、数据库热备 | 智能存储池 CloudPool、跨网段直连、跨模块传输 flow、LVM/ZFS/RBD/PBS、Air-Gap 摆渡 |
-
-**购买专业版 / 旗舰版**：访问 [www.fonriv.com](https://www.fonriv.com) 或联系微信 `lxrmyc`。
-下单时请附上本机「授权管理」页显示的**设备指纹**——授权与机器绑定。
+本发行版（社区版）以 AGPL-3.0 开源，包含上表全部能力；以下能力**未随包发布**（相关模块不在开源发行中）：分享管理（局域网分享向导 / HTTP 链接 / SMB 账号与权限）、多云文件管理 FonrVFS、智能存储池 CloudPool、跨模块传输 flow、LVM/ZFS/RBD/PBS 等存储卷管理。
 
 ## 许可
 
-Fonriv 社区版按专有免费软件许可发布，详见 [LICENSE](LICENSE)。版权所有 © 2026 Fonriv。
+Fonriv 社区版以 **GNU AGPL-3.0** 发布，详见 [LICENSE](LICENSE)。
+可自由使用、修改与再分发；以网络服务形式提供修改版时，须按同许可证向用户提供对应源码。
+版权所有 © 2026 Fonriv。

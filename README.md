@@ -5,9 +5,9 @@
 **Multi-Cloud Transfer & Backup Management Platform**
 源流多云传输与备份管理平台 · V1.0
 
-Community Edition — permanently free, for personal servers, homelab and study.
+Community Edition — open source (AGPL-3.0), permanently free, for personal servers, homelab and study.
 
-[Website 官网](https://www.fonriv.com) · [中文文档](README.zh-CN.md) · [Download 下载](https://www.fonriv.com)
+[Website 官网](https://www.fonriv.com) · [中文文档](README.zh-CN.md) · [Releases 下载](../../releases)
 
 </div>
 
@@ -21,7 +21,7 @@ Community Edition — permanently free, for personal servers, homelab and study.
 
 - **Official website / 官网**: [www.fonriv.com](https://www.fonriv.com)
 - **WeChat / 微信**: `lxrmyc`
-- **界面语言 UI**: 简体中文 / English (one-click switch)
+- **UI language / 界面语言**: 简体中文 / English (one-click switch)
 
 ---
 
@@ -29,7 +29,7 @@ Community Edition — permanently free, for personal servers, homelab and study.
 
 | Area | What you get |
 |---|---|
-| Server profiles & Connection Center | Multi-group profiles, encrypted credentials, live status (up to **8** profiles, ≤ **3** users) |
+| Server profiles & Connection Center | Multi-group profiles, encrypted credentials, live status — **unlimited profiles & users** |
 | File transfer | rsync-based upload / download / bidirectional sync / resume / parallel sharding (tuned for 10k+ small-file trees) |
 | Network shares | Mount & manage SMB / NFS network shares |
 | Web terminal | Full SSH terminal in the browser |
@@ -40,7 +40,7 @@ Community Edition — permanently free, for personal servers, homelab and study.
 | Remote consoles | RDP / VNC remote desktop in the browser (guacd gateway — install it from the built-in Dependencies panel with one click) |
 | Alerts | Webhook / Email notifications |
 | QoS | Time-based bandwidth limits |
-| Auto update | Built-in updater on the official channel (`https://www.fonriv.com/update`), sha256-verified |
+| Auto update | Built-in updater against **GitHub Releases** (a self-hosted static directory is also supported), sha256-verified |
 | UI language | 简体中文 / English |
 
 ## Requirements
@@ -51,12 +51,12 @@ Community Edition — permanently free, for personal servers, homelab and study.
 
 ## Quick start
 
-### Option A — tarball + one-shot script
+### Option A — tarball + one-shot script (the tarball contains the full source)
 
 ```bash
 # 1. unpack
 sudo mkdir -p /opt/fonriv
-sudo tar xzf fonriv_community_v1.0.0.tar.gz -C /opt/fonriv
+sudo tar xzf fonriv-community-v1.0.0-linux-amd64.tar.gz -C /opt/fonriv
 cd /opt/fonriv
 
 # 2. one-shot install (creates venv, writes systemd unit, starts the service)
@@ -69,8 +69,8 @@ sudo bash scripts/install.sh --yes
 ### Option B — deb package (Debian 12 / Ubuntu 22.04+)
 
 ```bash
-sudo apt-get install -y ./fonriv_1.0.0_amd64.deb
-# installs to /opt/fonriv, data in /var/lib/fonriv, offline python wheels included
+sudo apt-get install -y ./fonriv-community_1.0.0_amd64.deb
+# installs to /opt/fonriv, data in /opt/fonriv/data, offline python wheels included
 ```
 
 Manage the service:
@@ -85,21 +85,10 @@ Data (SQLite + logs) lives in `data/` under the install directory. **Back up `da
 
 ## Updating
 
-**About → Check for updates** checks the official channel automatically (default `https://www.fonriv.com/update`). Every package is sha256-verified before it is applied; a failed check is rejected automatically.
-
-## Editions · 版本
-
-| | Community 社区版 | Pro 专业版 | Enterprise 旗舰版 |
-|---|---|---|---|
-| Price | **Free 永久免费** | [详情咨询官网 · See official site](https://www.fonriv.com) | [详情咨询官网 · See official site](https://www.fonriv.com) |
-| Target | Personal / Homelab | Small teams | Business |
-| Profiles / Users | 8 / 3 | 60 | Unlimited |
-| Extra features | — | Share management (LAN share wizard, HTTP links, SMB accounts & ACL), multi-cloud file manager (FonrVFS), AI assistant, restic dedup backup, real-time sync watcher, K8s backup, DB hot backup | CloudPool federated storage, cross-segment direct link, flow engine, LVM/ZFS/RBD/PBS, Air-Gap ferry |
-
-**To purchase Pro / Enterprise**: visit [www.fonriv.com](https://www.fonriv.com) or contact WeChat `lxrmyc`.
-Please include the **device fingerprint** shown on the *License* page of your installation — licenses are bound to the machine.
+**About → Check for updates** targets **GitHub Releases** by default (the dialog can switch to a self-hosted static directory). Every package is sha256-verified before it is applied; a failed check is rejected automatically.
 
 ## License
 
-Fonriv Community Edition is distributed under a proprietary freeware license — see [LICENSE](LICENSE).
-Copyright © 2026 Fonriv. All rights reserved.
+Fonriv Community Edition is released under the **GNU AGPL-3.0** — see [LICENSE](LICENSE).
+You are free to use, modify and redistribute it; if you run a modified version as a network service, you must offer the corresponding source to its users.
+Copyright © 2026 Fonriv.
