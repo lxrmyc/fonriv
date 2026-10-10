@@ -1,0 +1,27 @@
+#!/bin/bash
+# Fonriv deb · 安装前: 保护已存在的另一套 fonriv.service (手工部署/旧版本)
+set -u
+MARK='Fonriv (deb package)'
+for u in /lib/systemd/system/__UNIT__.service /etc/systemd/system/__UNIT__.service; do
+    [ -f "$u" ] || continue
+    if ! grep -qF "$MARK" "$u"; then
+        if [ "${FONRIV_DEB_ALLOW_UNIT_OVERWRITE:-0}" = "1" ]; then
+            mkdir -p /var/backups/fonriv
+            cp -a "$u" "/var/backups/fonriv/$(basename "$u").replaced.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+            echo "[fonriv] 已按要求覆盖既有服务单元 ($u, 原文件已备份到 /var/backups/fonriv/)"
+        else
+            cat >&2 <<EOF
+
+[fonriv][安装中止] 机器上已存在另一套 Fonriv 服务单元: $u
+   它由手工部署或旧版本安装创建, 直接覆盖可能影响正在运行的服务。
+   已确认要覆盖时, 请用:
+       FONRIV_DEB_ALLOW_UNIT_OVERWRITE=1 dpkg -i <此包>.deb
+   或先手工停用旧单元:
+       systemctl disable --now __UNIT__ && rm -f $u
+
+EOF
+            exit 1
+        fi
+    fi
+done
+exit 0

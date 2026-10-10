@@ -1,0 +1,12 @@
+#!/bin/bash
+# Fonriv deb · 卸载前: 先停服务(升级时不动)
+set -u
+case "${1:-}" in
+    remove|deconfigure)
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl stop __UNIT__ >/dev/null 2>&1 || true
+            systemctl disable __UNIT__ >/dev/null 2>&1 || true
+        fi
+        ;;
+esac
+exit 0

@@ -1,0 +1,37 @@
+#!/bin/bash
+# Fonriv deb · 卸载后: 默认保留数据; purge 时先备份再删
+set -u
+APP=/opt/fonriv
+UNIT="__UNIT__"
+DATADIR=/var/lib/fonriv
+case "${1:-}" in
+    purge)
+        mkdir -p /var/backups/fonriv 2>/dev/null || true
+        if [ -d "$DATADIR" ]; then
+            BK="/var/backups/fonriv/fonriv-data-purge-$(date +%Y%m%d_%H%M%S).tar.gz"
+            tar czf "$BK" -C "$(dirname "$DATADIR")" "$(basename "$DATADIR")" 2>/dev/null || true
+            echo "[fonriv] purge 前已备份数据到: $BK"
+            rm -rf "$DATADIR"
+        fi
+        [ -L "$APP/data" ] && rm -f "$APP/data"
+        rm -rf "$APP/venv"          # postinst 建的虚拟环境不归 dpkg 管, 必须自己清
+        # 运行期由程序生成的 __pycache__ 会让 dpkg 保留空壳目录 → 一并清掉
+        find "$APP" -type d -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
+        rm -rf "$APP" 2>/dev/null || true
+        rm -rf /var/backups/fonriv/*.replaced.* 2>/dev/null || true
+        ;;
+    remove)
+        rm -rf "$APP/venv"          # 卸载也清掉虚拟环境(dpkg 只删包内文件)
+        find "$APP" -type d -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
+        cat <<EOF
+
+[fonriv] 已卸载, 数据仍保留在 $DATADIR (数据库/日志)。
+         需要连数据一起删除:  dpkg --purge fonriv
+
+EOF
+        ;;
+esac
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+fi
+exit 0

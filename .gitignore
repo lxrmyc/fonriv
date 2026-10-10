@@ -1,0 +1,29 @@
+# ── 运行期数据 (服务自建, 不得入库) ──
+data/
+dist/
+backups/
+updates/
+outputs/
+build/
+*.log
+*.log.*
+nohup.out
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.abi3.so
+.venv/
+venv/
+.pytest_cache/
+
+# ── 前端 ──
+node_modules/
+
+# ── 编辑器 / 工具 ──
+.zcode/
+.zcodeignore
+.plan_*
+.claude/
+.DS_Store
+*.swp

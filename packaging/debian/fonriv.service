@@ -1,0 +1,25 @@
+# Fonriv (deb package) — 请勿手工改这个文件, 要改请用 systemctl edit fonriv
+[Unit]
+Description=Fonriv 源流云运维传输与备份管理平台
+Documentation=file:/opt/fonriv/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/fonriv
+EnvironmentFile=-/etc/fonriv/fonriv.conf
+Environment=PYTHONUNBUFFERED=1
+# 端口优先级: --port > 数据库 app_settings.web_port > FONRIV_PORT > 8000
+ExecStart=/opt/fonriv/venv/bin/python /opt/fonriv/server.py
+Restart=on-failure
+RestartSec=3
+# 应用做挂载/磁盘/服务管理需要 root(与手工部署一致); Web 侧由账号+权限门控保护
+User=root
+KillMode=process
+LimitNOFILE=65535
+StandardOutput=append:/var/log/fonriv.log
+StandardError=append:/var/log/fonriv.log
+
+[Install]
+WantedBy=multi-user.target

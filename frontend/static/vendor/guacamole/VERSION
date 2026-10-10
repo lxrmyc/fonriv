@@ -1,0 +1,5 @@
+guacamole-common-js 1.5.5 (Apache Guacamole 客户端 JS, Apache-2.0)
+来源: Maven Central org.apache.guacamole:guacamole-common-js:1.5.5 (guacamole-common-js-1.5.5.zip)
+入库文件: all.min.js (生产用) · all.js (未压缩, 便于排障) · LICENSE
+入库日期: 2026-09-16 · 抓取脚本: scripts/fetch_guacamole.sh
+刷新方式: bash scripts/fetch_guacamole.sh 1.5.5

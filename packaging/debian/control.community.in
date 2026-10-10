@@ -1,0 +1,23 @@
+Package: fonriv
+Version: @VERSION@
+Section: admin
+Priority: optional
+Architecture: @ARCH@
+Depends: python3 (>= 3.9), python3-venv, openssh-client, tar, gzip, coreutils
+Recommends: rsync, sshpass, cifs-utils, nfs-common, p7zip-full, zip, unzip, xz-utils, lsof, procps
+Suggests: zstd, ffmpeg, smartmontools, docker.io, guacd, libguac-client-rdp0
+Installed-Size: @SIZE@
+Maintainer: Fonriv <support@fonriv.local>
+Description: Fonriv 源流 · 社区版 (永久免费) — 传输同步 · 备份恢复 · 运维面板
+ Web 界面的 Linux / Proxmox 运维工具, 面向个人服务器 / NAS / Homelab / 学习评估:
+ 文件同步与传输 (rsync)、服务器档案与连接中心、网络共享 (SMB / NFS)、Web SSH 终端、
+ 定时计划、数据总览与操作审计、Proxmox VE 备份与 vzdump 归档、Docker 容器管理、
+ RDP / VNC 远程控制台、告警通知 (Webhook / 邮件)、QoS 分时限速、在线更新。
+ .
+ 社区版永久免费; 官网 www.fonriv.com (文档 / 下载 / 更多信息)。
+ .
+ 装完打开 http://<主机>:8000/ 会进入首次配置向导, 由你自己设定超级管理员账号与
+ 界面风格。
+ .
+ 本包自带离线依赖轮子 (wheel), 安装时在 /opt/fonriv/venv 内建虚拟环境, 不改动
+ 系统 Python, 也不联网装依赖。
